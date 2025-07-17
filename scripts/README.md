@@ -41,8 +41,8 @@ The repositories are defined in `config/repositories.yml`. You can edit this fil
 ## Repository Categories
 
 - **microlensing_tools**: Analysis tools and libraries
+- **general_tools:** Astronomy and Roman related tools
 - **jupyter_notebooks**: Tutorial notebooks and examples
-- **roman_research_nexus**: Roman Research Nexus tools
 - **web_resources**: Documentation and web content
 
 ## How It Works

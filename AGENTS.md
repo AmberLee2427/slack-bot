@@ -26,14 +26,14 @@ slack-bot/
 │   │   ├── microlensing_tools/  # Open source microlensing analysis tools
 │   │   ├── jupyter_notebooks/   # Microlensing analysis notebooks
 │   │   ├── microlens_submit/    # Data challenge submission tool
-│   │   ├── roman_research_nexus/ # Roman Research Nexus documentation
+│   │   ├── general_tools/       # Roman and general astronomy tools
 │   │   ├── web_resources/       # Microlensing Source and other web content
 │   │   └── journal_articles/    # Microlensing research papers
 │   ├── chunked/                 # Output from pyragify processing
 │   │   ├── microlensing_tools/  # Chunked Python code and docs
 │   │   ├── jupyter_notebooks/   # Chunked notebooks and examples
 │   │   ├── microlens_submit/    # Chunked submission tool docs
-│   │   ├── roman_research_nexus/ # Chunked RRN documentation
+│   │   ├── general_tools/       # Chunked Roman/astro code and docs
 │   │   ├── web_resources/       # Chunked web content
 │   │   └── journal_articles/    # Chunked research papers
 │   └── embeddings/              # txtai embeddings database

@@ -1,11 +1,12 @@
 # Repository Configuration for Roman Galactic Exoplanet Survey Slack Bot
 # This file defines all repositories that should be cloned and maintained in the knowledge base
 
-microlensing_tools:
+microlens_submit:
   - name: microlens-submit
     url: https://github.com/rges-pit/microlens-submit.git
     description: "Submission tool for the 2nd Roman microlensing data challenge"
-    
+
+microlensing_tools:
   - name: pyLIMA
     url: https://github.com/ebachelet/pyLIMA.git
     description: "pyLIMA is the first open source software for modeling microlensing events."
@@ -53,6 +54,10 @@ microlensing_tools:
   - name: GCMicrolensing
     url: https://github.com/GCMicrolensing-Org/GCMicrolensing.git
     description: "Tools for simulating gravitational microlensing events with single, binary, and triple lens systems. This package is under active development."
+
+  - name: sfit_minimizer
+    url: https://github.com/jenniferyee/sfit_minimizer.git
+    description: "Minimization routine based on the algorithm A. Gould wrote in Fortran for minimizing chi2."
 
 general_tools:
   - name: spacekit

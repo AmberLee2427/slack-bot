@@ -19,53 +19,6 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Default repository configuration
-DEFAULT_REPOS = {
-    "microlensing_tools": [
-        {
-            "name": "microlens-submit",
-            "url": "https://github.com/roman-telescope/microlens-submit",
-            "description": "Official submission tool for Roman data challenge"
-        },
-        {
-            "name": "LIMA",
-            "url": "https://github.com/ebachelet/pyLIMA",
-            "description": "Python Lightcurve Identification and Microlensing Analysis"
-        },
-        {
-            "name": "odel",
-            "url": "https://github.com/rpoleski/MulensModel",
-            "description": "Microlensing modeling package"
-        }
-    ],
-    "jupyter_notebooks": [
-        {
-            "name": "roman-microlensing-examples",
-            "url": "https://github.com/roman-telescope/roman-microlensing-examples",
-            "description": "Official Roman microlensing analysis examples"
-        },
-        {
-            "name": "microlensing-tutorials",
-            "url": "https://github.com/ebachelet/microlensing-tutorials",
-            "description": "Educational microlensing tutorials"
-        }
-    ],
-    "roman_research_nexus": [
-        {
-            "name": "roman-research-nexus",
-            "url": "https://github.com/roman-telescope/roman-research-nexus",
-            "description": "man Research Nexus documentation and tools"
-        }
-    ],
-    "web_resources": [
-        {
-            "name": "microlensing-source",
-            "url": "https://github.com/roman-telescope/microlensing-source",
-            "description": "Microlensing Source web resources"
-        }
-    ]
-}
-
 
 class RepositoryManager:
     def __init__(self, base_path: str = "knowledge_base/raw"):
@@ -77,7 +30,6 @@ class RepositoryManager:
         if os.path.exists(config_file):
             with open(config_file, 'r') as f:
                 return yaml.safe_load(f)
-        return DEFAULT_REPOS
     
     def save_config(self, config: Dict, config_file: str):
         """Save repository configuration to YAML file."""

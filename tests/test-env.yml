@@ -1,0 +1,36 @@
+name: roman-slack-bot
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Core Python version
+  - python=3.9
+
+  # Core bot and RAG dependencies
+  - pip
+  - git
+  - pyyaml
+  - dill
+  - apscheduler
+  - slack-sdk
+  - aiohttp
+  - pyee
+  - httpx
+  - tzdata
+  - pydantic
+  - structlog
+  - multidict
+
+  # For txtai (semantic search, embeddings)
+  - pip:
+      # For pyragify (repo chunking)
+      - omegaconf>=2.3.0
+      - pathspec>=0.12.1
+      - typer>=0.15.1
+
+      # For development/testing
+      - pytest
+      - coverage
+
+# Optional: If you want to use local editable installs for your own src/ packages,
+# add pip install -e ../src/yourpackage in a post-build step or requirements file.
