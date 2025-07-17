@@ -1,0 +1,55 @@
+# Repository Configuration for Roman Galactic Exoplanet Survey Slack Bot
+# This file defines all repositories that should be cloned and maintained in the knowledge base
+
+microlensing_tools:
+  - name: microlens-submit
+    url: https://github.com/roman-telescope/microlens-submit
+    description: "Official submission tool for Roman data challenge"
+    
+  - name: pyLIMA
+    url: https://github.com/ebachelet/pyLIMA
+    description: "Python Lightcurve Identification and Microlensing Analysis"
+    
+  - name: MulensModel
+    url: https://github.com/rpoleski/MulensModel
+    description: "Microlensing modeling package"
+    
+  - name: pyDIA
+    url: https://github.com/mtfsahin/pyDIA
+    description: "Python Difference Image Analysis package"
+
+jupyter_notebooks:
+  - name: roman-microlensing-examples
+    url: https://github.com/roman-telescope/roman-microlensing-examples
+    description: "Official Roman microlensing analysis examples"
+    
+  - name: microlensing-tutorials
+    url: https://github.com/ebachelet/microlensing-tutorials
+    description: "Educational microlensing tutorials"
+    
+  - name: roman-data-challenge-examples
+    url: https://github.com/roman-telescope/roman-data-challenge-examples
+    description: "Examples and tutorials for Roman data challenges"
+    
+  - name: roman-research-nexus
+    url: https://github.com/roman-telescope/roman-research-nexus
+    description: "Roman Research Nexus documentation and tools"
+    
+  - name: roman-tools
+    url: https://github.com/roman-telescope/roman-tools
+    description: "Roman mission tools and utilities"
+
+web_resources:
+  - name: microlensing-source
+    url: https://github.com/roman-telescope/microlensing-source
+    description: "Microlensing Source web resources"
+    
+  - name: roman-docs
+    url: https://github.com/roman-telescope/roman-docs
+    description: "Roman mission documentation"
+
+# Add your custom repositories here
+# custom_repos:
+#   - name: my-microlensing-tool
+#     url: https://github.com/your-username/your-repo
+#     description: "Your custom microlensing analysis tool"

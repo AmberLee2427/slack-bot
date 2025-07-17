@@ -133,3 +133,12 @@ setup.py
 
 .mypy_cache
 *.db
+
+# Knowledge Base Pipeline
+# Raw repositories and resources (large, can be regenerated)
+knowledge_base/raw/
+# Chunked content from pyragify (intermediate processing output)
+knowledge_base/chunked/
+# Model caches and temporary files
+knowledge_base/embeddings/models/
+*.sqlite-journal

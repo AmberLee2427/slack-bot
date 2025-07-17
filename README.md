@@ -1,123 +1,225 @@
-# Slack Machine
+# Roman Galactic Exoplanet Survey - AI Assistant Bot
 
-[![Join the chat at Slack](https://img.shields.io/badge/chat-slack-green?logo=slack&logoColor=white)](https://join.slack.com/t/slack-machine-chat/shared_invite/zt-398eow0ok-mqXTOMVGlSKAcMtR53UZMQ)
-[![image](https://img.shields.io/pypi/v/slack-machine.svg)](https://pypi.python.org/pypi/slack-machine)
-[![image](https://img.shields.io/pypi/l/slack-machine.svg)](https://pypi.python.org/pypi/slack-machine)
-[![image](https://img.shields.io/pypi/pyversions/slack-machine.svg)](https://pypi.python.org/pypi/slack-machine)
-[![CI Status](https://github.com/DonDebonair/slack-machine/actions/workflows/ci.yml/badge.svg)](https://github.com/DonDebonair/slack-machine/actions/workflows/ci.yml)
-[![image](https://codecov.io/gh/DonDebonair/slack-machine/branch/main/graph/badge.svg)](https://codecov.io/gh/DonDebonair/slack-machine)
+[![Python3.9ttps://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Slack Machine is a simple, yet powerful and extendable Slack bot framework. More than just a bot, Slack
-Machine is a framework that helps you develop your Slack workspace into a ChatOps powerhouse. Slack Machine is built
-with an intuitive plugin system that lets you build bots quickly, but also allows for easy code organization. A
-plugin can look as simple as this:
+An intelligent Slack bot designed to support participants in the **Roman Galactic Exoplanet Survey - Project Infrastructure Team data challenge**. This bot leverages advanced AI techniques to provide context-aware assistance with microlensing analysis, data challenge procedures, and related tools.
 
+## 🎯 Purpose
+
+The Roman mission will revolutionize our understanding of exoplanets through gravitational microlensing. This bot serves as an AI assistant that can:
+
+- **Answer questions** about microlensing analysis techniques
+- **Provide guidance** on data challenge procedures and submission
+- **Explain tools** like `microlens-submit` and Roman Research Nexus
+- **Share examples** from open-source microlensing analysis tools
+- **Reference research** papers and documentation
+- **Help with code** and data processing workflows
+
+## 🚀 Features
+
+### 🤖 Intelligent Responses
+- **Context-aware answers** based on comprehensive microlensing knowledge
+- **Citation support** - always provides sources for information
+- **Code assistance** with examples from real analysis tools
+- **Multi-format responses** - text, code blocks, links, and rich formatting
+
+### 📚 Comprehensive Knowledge Base
+The bot has access to:
+- **Open-source microlensing tools** and their documentation
+- **Jupyter notebooks** demonstrating analysis techniques
+- **Data challenge resources** including submission procedures
+- **Roman Research Nexus** documentation and usage guides
+- **Research papers** and journal articles on microlensing
+- **Web resources** from Microlensing Source and related sites
+
+### 🔧 Technical Capabilities
+- **Semantic search** using advanced embeddings
+- **RAG (Retrieval Augmented Generation)** for accurate responses
+- **Slack integration** with rich message formatting
+- **Thread support** for extended conversations
+- **Slash commands** for quick access to common functions
+
+## 🏗️ Architecture
+
+This bot is built using a sophisticated three-stage data pipeline:
+
+```
+Raw Repositories → Chunked Content → Embeddings Database
+     ↓                ↓                    ↓
+  Git clones    pyragify processing   txtai embeddings
+```
+1 Stage**: Original repositories and resources
+2**Chunked Stage**: Semantic chunks ready for AI processing
+3. **Embeddings Stage**: Vector database for fast semantic search
+
+## 🛠️ Setup & Installation
+
+### Prerequisites
+- Python 3.9 or higher
+- Git
+- Slack workspace with admin permissions
+
+### Quick Start
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd slack-bot
+   ```
+
+2. **Install dependencies**
+   ```bash
+   # Using uv (recommended)
+   uv sync
+   
+   # Or using pip
+   pip install -r requirements.txt
+   ```
+
+3. **Configure Slack**
+   - Create a new Slack app at api.slack.com/apps](https://api.slack.com/apps)
+   - Add the following OAuth scopes:
+     - `chat:write`
+     - `app_mentions:read`
+     - `channels:history`
+     - `commands`
+   - Copy your Bot Token and App Token
+
+4. **Create configuration**
+   ```bash
+   cp local_settings.py.example local_settings.py
+   ```
+   
+   Edit `local_settings.py`:
+   ```python
+   SLACK_APP_TOKEN = "xapp-your-app-token"
+   SLACK_BOT_TOKEN = "xoxb-your-bot-token"
+   ```
+
+5. **Build the knowledge base**
+   ```bash
+   # This will process all microlensing repositories
+   python scripts/build_knowledge_base.py
+   ```
+
+6**Start the bot**
+   ```bash
+   python -m bot.main
+   ```
+
+## 📖 Usage
+
+### For Data Challenge Participants
+
+The bot responds to mentions and direct messages. Simply ask questions like:
+
+- *"How do I submit my results using microlens-submit?"*
+- *What arethe best practices for microlensing light curve analysis?"*
+- *"Can you show me an example of using the Roman Research Nexus?"*
+- *"What tools are available for microlensing data processing?"*
+
+### For Developers
+
+#### Adding New Knowledge Sources
+```bash
+# Add a new repository to the knowledge base
+python scripts/add_repository.py --repo https://github.com/example/microlensing-tool --name tool_name
+
+# Rebuild the entire knowledge base
+python scripts/build_knowledge_base.py --rebuild
+```
+
+#### Creating Custom Plugins
 ```python
 from machine.plugins.base import MachineBasePlugin
-from machine.plugins.message import Message
 from machine.plugins.decorators import respond_to
 
-
-class DeploymentPlugin(MachineBasePlugin):
-    """Deployments"""
-
-    @respond_to(r"deploy (?P<application>\w+) to (?P<environment>\w+)")
-    async def deploy(self, msg: Message, application, environment):
-        """deploy <application> <environment>: deploy application to target environment"""
-        await msg.say(f"Deploying {application} to {environment}")
+class CustomPlugin(MachineBasePlugin):
+    @respond_to(rcustom command")
+    async def handle_custom(self, msg):
+        await msg.say("Custom response!")
 ```
 
-## _Breaking Changes_
+## 🔧 Configuration
 
-**Dropped support for Python 3.8** (v0.38.0)
+### Environment Variables
+- `SLACK_APP_TOKEN`: Your Slack app token
+- `SLACK_BOT_TOKEN`: Your Slack bot token
+- `KNOWLEDGE_BASE_PATH`: Path to knowledge base (default: `knowledge_base/`)
+- `LOG_LEVEL`: Logging level (default: `INFO`)
 
-As of [v0.38.0](https://github.com/DonDebonair/slack-machine/releases/tag/v0.38.0), support for Python 3.8 has been
-dropped. Python 3.8 has reached end-of-life on 2024-10-07.
+### Knowledge Base Settings
+The bot's knowledge base can be customized in `config/knowledge_base.yml`:
+```yaml
+repositories:
+  - name: microlens-submit
+    url: https://github.com/roman-telescope/microlens-submit
+    type: submission_tool
+  
+  - name: example-analysis-tool
+    url: https://github.com/example/microlensing-tool
+    type: analysis_tool
+```
 
-## Features
+## 🧪 Development
 
-- Get started with mininal configuration
-- Built on top of the [Slack Events API](https://api.slack.com/apis/connections/events-api) for smoothly responding
-  to events in semi real-time. Uses [Socket Mode](https://api.slack.com/apis/connections/socket) so your bot doesn't
-  need to be exposed to the internet!
-- Support for rich interactions using the [Slack Web API](https://api.slack.com/web)
-- High-level API for maximum convenience when building plugins
-- Low-level API for maximum flexibility
-- Built on top of [AsyncIO](https://docs.python.org/3/library/asyncio.html) to ensure good performance by handling
-  communication with Slack concurrently
+### Project Structure
+```
+slack-bot/
+├── bot/                    # Bot implementation
+│   ├── plugins/           # Slack bot plugins
+│   ├── config/           # Configuration files
+│   └── utils/            # Utility functions
+├── knowledge_base/        # AI knowledge base
+├── scripts/              # Build and maintenance scripts
+├── docs/                 # Documentation
+└── tests/                # Test suite
+```
 
-### Plugin API features:
-
-- Listen and respond to any regular expression
-- Respond to Slash Commands
-- Capture parts of messages to use as variables in your functions
-- Respond to messages in channels, groups and direct message conversations
-- Respond with reactions
-- Respond in threads
-- Respond with ephemeral messages
-- Send DMs to any user
-- Support for [blocks](https://api.slack.com/reference/block-kit/blocks)
-- Support for [message attachments](https://api.slack.com/docs/message-attachments) [Legacy 🏚]
-- Support for [interactive elements](https://api.slack.com/block-kit)
-- Support for [modals](https://api.slack.com/surfaces/modals)
-- Listen and respond to any [Slack event](https://api.slack.com/events) supported by the Events API
-- Store and retrieve any kind of data in persistent storage (currently Redis, DynamoDB, SQLite and in-memory storage are
-  supported)
-- Schedule actions and messages
-- Emit and listen for events
-- Help texts for Plugins
-
-### Coming Soon
-
-- Support for shortcuts
-- ... and much more
-
-## Installation
-
-You can add Slack Machine to your uv project by running:
-
+### Running Tests
 ```bash
-uv add slack-machine
+pytest tests/
 ```
 
-or add it to your [Poetry](https://python-poetry.org/) project:
+### Contributing
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
 
-```bash
-poetry add slack-machine
-```
+## 📚 Documentation
 
-Lastly, you can install it using pip (not recommended):
+- [AGENTS.md](AGENTS.md) - Technical guide for AI agents working on this project
+- [API Documentation](docs/api.md) - Bot API reference
+- [Plugin Development](docs/plugins.md) - How to create custom plugins
+- [Knowledge Base Management](docs/knowledge_base.md) - Managing the AI knowledge base
 
-``` bash
-$ pip install slack-machine
-```
+## 🤝 Support
 
-It is **strongly recommended** that you install `slack-machine` inside a
-[virtual environment](https://docs.python.org/3/tutorial/venv.html)!
+### For Data Challenge Participants
+- Ask questions directly to the bot in your Slack workspace
+- Check the [Roman Data Challenge documentation](https://roman.gsfc.nasa.gov/science/RRG_Data_Challenge.html)
+- Join the [Roman Community Slack](https://roman.gsfc.nasa.gov/community.html)
 
-## Usage
+### For Developers
+- [Open an issue](https://github.com/your-repo/issues) for bugs or feature requests
+- Check the [development documentation](docs/development.md)
+- Join our [developer discussions](https://github.com/your-repo/discussions)
 
-1. Create a directory for your Slack Machine bot: `mkdir my-slack-bot && cd my-slack-bot`
-2. Add a `local_settings.py` file to your bot directory: `touch local_settings.py`
-3. Create a new app in Slack: <https://api.slack.com/apps>
-4. Choose to create an app from an _App manifest_
-5. Copy/paste the following manifest: [`manifest.yaml`](docs/extra/manifest.yaml)
-6. Add the Slack App and Bot tokens to your `local_settings.py` like this:
+## 📄 License
 
-    ``` title="local_settings.py"
-    SLACK_APP_TOKEN = "xapp-my-app-token"
-    SLACK_BOT_TOKEN = "xoxb-my-bot-token"
-    ```
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-7. Start the bot with `slack-machine`
-8. ...
-9. Profit!
+## 🙏 Acknowledgments
 
-## Documentation
+- **Roman Space Telescope Team** for the data challenge opportunity
+- **Microlensing Community** for open-source tools and resources
+- **Slack Machine** framework for the bot infrastructure
+- **txtai** for the embeddings and RAG capabilities
+- **pyragify** for repository processing
 
-You can find the documentation for Slack Machine here: https://dondebonair.github.io/slack-machine/
+---
 
-Go read it to learn how to properly configure Slack Machine, write plugins, and more!
-
-There is also an example plugin that shows off many of the features of Slack Machine:
-[Slack Machine Kitchensink Plugin](https://github.com/DonDebonair/sm-kitchensink-plugin)
+**Built with ❤️ for the Roman Galactic Exoplanet Survey community** 
