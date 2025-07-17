@@ -48,6 +48,7 @@ slack-bot/
 │   ├── config/                  # Bot configuration
 │   └── utils/                   # Utility functions
 ├── docs/                        # Your bot documentation
+├── test/                        # testing script and environment stuff
 ├── pyproject.toml               # Your bot dependencies
 ├── local_settings.py            # Bot configuration (not in git)
 ├── .gitignore                   # Git ignore rules (includes knowledge_base/raw and knowledge_base/chunked)
@@ -62,7 +63,7 @@ slack-bot/
 - **Documents**: PDFs, markdown files, etc.
 - **Purpose**: Original, unprocessed source material
 
-### Stage 2Chunked Content (`knowledge_base/chunked/`)
+### Stage 2: Chunked Content (`knowledge_base/chunked/`)
 - **Processed by**: pyragify
 - **Output**: Semantic chunks of code, documentation, and text
 - **Format**: `.txt` files organized by content type (python/, markdown/, other/)
@@ -81,7 +82,7 @@ slack-bot/
 - **pyragify**: Processes repositories into LLM-friendly chunks
 - **slack-machine**: Slack bot framework with plugin system
 
-###2ledge Base Sources
+### 2. Kowledge Base Sources
 The bot will ingest and process the following resources:
 
 #### Microlensing Analysis Tools
@@ -131,14 +132,14 @@ cd slack-bot
 uv sync
 ```
 
-###2ge Base Population
+### 2 Knowlege Base Population
 ```bash
 # Stage 1: Clone raw repositories
 git clone https://github.com/example/microlensing-tool knowledge_base/raw/microlensing_tools/
 git clone https://github.com/example/microlens-submit knowledge_base/raw/microlens_submit/
 # ... repeat for all repositories
 
-# Stage 2Process with pyragify
+# Stage 2: Process with pyragify
 python -m pyragify --repo-path knowledge_base/raw/microlensing_tools --output-dir knowledge_base/chunked/microlensing_tools
 python -m pyragify --repo-path knowledge_base/raw/microlens_submit --output-dir knowledge_base/chunked/microlens_submit
 # ... repeat for all repositories
@@ -151,7 +152,7 @@ embeddings.index([open(f).read() for f in glob.glob(knowledge_base/chunked/**/*.
 embeddings.save('knowledge_base/embeddings/')
 ```
 
-###3. Bot Development
+### 3. Bot Development
 ```python
 # Example plugin structure
 from machine.plugins.base import MachineBasePlugin
