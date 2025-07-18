@@ -54,6 +54,14 @@ def test_rag_service():
             context = rag.get_context_for_query(query)
             print(f"  Context length: {len(context)} chars")
             print(f"  Context preview: {context[:150]}...")
+            
+            # Test AI-ready results
+            ai_results = rag.get_raw_results_for_ai(query, limit=1)
+            if ai_results:
+                print(f"  AI-ready result:")
+                print(f"    GitHub URL: {ai_results[0].get('github_url', 'N/A')}")
+                print(f"    Content length: {len(ai_results[0]['text'])} chars")
+            
             print()
         
         print("✅ All tests passed!")
