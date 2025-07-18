@@ -153,9 +153,54 @@ def build_txtai_index(config_path: str, base_path: str = "knowledge_base/raw", e
         logger.warning("No documents found to index")
 
 
-def build_pipeline(config_path: str, base_path: str = "knowledge_base/raw", embeddings_path: str = "knowledge_base/embeddings", dry_run: bool = False, category: str = None, force_update: bool = False) -> None:
+def build_pipeline(config_path: str, base_path: str = "knowledge_base/raw", embeddings_path: str = "knowledge_base/embeddings", dry_run: bool = False, category: str = None, force_update: bool = False, dirty: bool = False) -> None:
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger(__name__)
+    
     clone_repositories(config_path, base_path, dry_run, category, force_update)
     build_txtai_index(config_path, base_path, embeddings_path, dry_run, category)
+    
+    if not dirty and not dry_run:
+        logger.info("Cleaning up raw repositories...")
+        cleanup_raw_repositories(config_path, base_path, category)
+    elif dry_run and not dirty:
+        logger.info("[DRY RUN] Would clean up raw repositories after processing")
+
+
+def cleanup_raw_repositories(config_path: str, base_path: str = "knowledge_base/raw", category: str = None) -> None:
+    """Clean up raw repositories after embeddings are built"""
+    logger = logging.getLogger(__name__)
+    
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+    
+    categories = [category] if category else list(config.keys())
+    for cat in categories:
+        repos = config.get(cat)
+        if not isinstance(repos, list):
+            continue
+        for repo in repos:
+            repo_name = repo["name"]
+            repo_dir = Path(base_path) / cat / repo_name
+            
+            if repo_dir.exists():
+                try:
+                    import shutil
+                    shutil.rmtree(repo_dir)
+                    logger.info(f"Cleaned up {cat}/{repo_name}")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up {cat}/{repo_name}: {e}")
+    
+    # Clean up empty category directories
+    base_path_obj = Path(base_path)
+    if base_path_obj.exists():
+        for cat_dir in base_path_obj.iterdir():
+            if cat_dir.is_dir() and not any(cat_dir.iterdir()):
+                try:
+                    cat_dir.rmdir()
+                    logger.info(f"Cleaned up empty category directory: {cat_dir}")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up empty category directory {cat_dir}: {e}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build the knowledge base by cloning repositories and creating txtai embeddings.")
@@ -165,6 +210,8 @@ if __name__ == "__main__":
     parser.add_argument("--dry-run", action="store_true", help="Show what would be done without making changes")
     parser.add_argument("--category", help="Process only a specific category")
     parser.add_argument("--force-update", action="store_true", help="Update repositories if they already exist (git pull)")
+    parser.add_argument("--dirty", action="store_true", help="Leave the raw repo in place after embeddings are built")
+
     args = parser.parse_args()
 
     build_pipeline(
@@ -173,5 +220,6 @@ if __name__ == "__main__":
         embeddings_path=args.embeddings_path,
         dry_run=args.dry_run,
         category=args.category,
-        force_update=args.force_update
+        force_update=args.force_update,
+        dirty=args.dirty
     )

@@ -4,7 +4,7 @@ channels:
   - defaults
 dependencies:
   # Core Python version
-  - python=3.9
+  - python=3.11
 
   # Core bot and RAG dependencies
   - pip
@@ -23,6 +23,13 @@ dependencies:
 
   # For txtai (semantic search, embeddings)
   - pip:
+      # Core ML dependencies for txtai
+      - torch
+      - transformers
+      - txtai
+      - faiss-cpu
+      - sentence-transformers
+      
       # For pyragify (repo chunking)
       - omegaconf>=2.3.0
       - pathspec>=0.12.1

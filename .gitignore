@@ -139,6 +139,8 @@ setup.py
 knowledge_base/raw/
 # Chunked content from pyragify (intermediate processing output)
 knowledge_base/chunked/
+# Embeddings indexes (generated, can be regenerated)
+knowledge_base/embeddings/
 # Model caches and temporary files
 knowledge_base/embeddings/models/
 *.sqlite-journal
