@@ -1,6 +1,6 @@
 """
 This script processes all repositories in the config/repositories.yml file.
-Orchestrates the full knowledge base build pipeline (cloning, chunking, embedding).
+Orchestrates the full knowledge base build pipeline (cloning, direct txtai indexing).
 """
 
 import os
@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 import logging
 import argparse
+import json
 
 def clone_repositories(config_path: str, base_path: str = "knowledge_base/raw", dry_run: bool = False, category: str = None, force_update: bool = False) -> None:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -60,82 +61,117 @@ def clone_repositories(config_path: str, base_path: str = "knowledge_base/raw", 
                     logger.error(f"Failed to clone {repo_name}: {e.stderr}")
 
 
-def chunk_repositories(config_path: str, base_path: str = "knowledge_base/raw", chunked_base: str = "knowledge_base/chunked", dry_run: bool = False, category: str = None, config_dir: str = "config") -> None:
+def build_txtai_index(config_path: str, base_path: str = "knowledge_base/raw", embeddings_path: str = "knowledge_base/embeddings", dry_run: bool = False, category: str = None) -> None:
+    """Build txtai embeddings index directly from raw files"""
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
+
+    try:
+        from txtai.embeddings import Embeddings
+    except ImportError:
+        logger.error("txtai not available. Please install with: pip install txtai")
+        return
 
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
-    Path(config_dir).mkdir(parents=True, exist_ok=True)
+    # Create embeddings directory
+    embeddings_dir = Path(embeddings_path)
+    embeddings_dir.mkdir(parents=True, exist_ok=True)
+
+    # Initialize txtai embeddings
+    embeddings = Embeddings({
+        "path": "sentence-transformers/all-MiniLM-L6-v2",
+        "content": True,
+        "backend": "faiss"
+    })
+
     categories = [category] if category else list(config.keys())
+    documents = []
+    
     for cat in categories:
         repos = config.get(cat)
         if not isinstance(repos, list):
             continue
         for repo in repos:
             repo_name = repo["name"]
-            dest_dir = Path(base_path) / cat / repo_name
-            chunked_dir = Path(chunked_base) / cat / repo_name
-            if not dest_dir.exists():
-                logger.warning(f"Repository directory {dest_dir} does not exist. Skipping chunking for {cat}/{repo_name}.")
+            repo_dir = Path(base_path) / cat / repo_name
+            
+            if not repo_dir.exists():
+                logger.warning(f"Repository directory {repo_dir} does not exist. Skipping {cat}/{repo_name}.")
                 continue
+                
+            logger.info(f"Processing {cat}/{repo_name}...")
+            
             if dry_run:
-                logger.info(f"[DRY RUN] Would run pyragify on {dest_dir} -> {chunked_dir}")
+                logger.info(f"[DRY RUN] Would process files in {repo_dir}")
                 continue
-            config_path_out = write_pyragify_config(dest_dir, chunked_dir, config_dir, cat, repo_name)
-            run_pyragify(dest_dir, chunked_dir, config_path_out, logger)
+            
+            # Collect all text files
+            text_files = []
+            for ext in ['.py', '.md', '.txt', '.rst', '.yaml', '.yml', '.json']:
+                text_files.extend(repo_dir.rglob(f"*{ext}"))
+            
+            # Skip common directories
+            skip_dirs = {'.git', '.github', '__pycache__', 'node_modules', '.pytest_cache', '.mypy_cache'}
+            text_files = [f for f in text_files if not any(skip in f.parts for skip in skip_dirs)]
+            
+            for file_path in text_files:
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Skip empty files
+                    if not content.strip():
+                        continue
+                    
+                    # Create document ID
+                    doc_id = f"{cat}/{repo_name}/{file_path.relative_to(repo_dir)}"
+                    
+                    # Add to documents list
+                    documents.append((doc_id, content, None))
+                    logger.debug(f"Added {doc_id} ({len(content)} chars)")
+                    
+                except Exception as e:
+                    logger.warning(f"Error reading {file_path}: {e}")
+    
+    if documents:
+        logger.info(f"Indexing {len(documents)} documents...")
+        if not dry_run:
+            embeddings.index(documents)
+            
+            # Save the embeddings index
+            embeddings.save(str(embeddings_dir / "index"))
+            logger.info(f"Saved embeddings index to {embeddings_dir / 'index'}")
+            
+            # Test search
+            results = embeddings.search("function", 3)
+            logger.info("Test search results:")
+            for result in results:
+                logger.info(f"  - {result['id']}: {result['text'][:100]}...")
+    else:
+        logger.warning("No documents found to index")
 
 
-def build_pipeline(config_path: str, base_path: str = "knowledge_base/raw", chunked_base: str = "knowledge_base/chunked", dry_run: bool = False, category: str = None, force_update: bool = False, config_dir: str = "config") -> None:
+def build_pipeline(config_path: str, base_path: str = "knowledge_base/raw", embeddings_path: str = "knowledge_base/embeddings", dry_run: bool = False, category: str = None, force_update: bool = False) -> None:
     clone_repositories(config_path, base_path, dry_run, category, force_update)
-    chunk_repositories(config_path, base_path, chunked_base, dry_run, category, config_dir)
-
-def run_pyragify(repo_path, output_dir, config_path, logger):
-    import subprocess
-    logger.info(f"Running pyragify on {repo_path} -> {output_dir} with config {config_path}")
-    try:
-        subprocess.run([
-            "python", "-m", "pyragify",
-            "--config-file", str(config_path)
-        ], check=True)
-        logger.info(f"pyragify completed for {repo_path}")
-    except subprocess.CalledProcessError as e:
-        logger.error(f"pyragify failed for {repo_path}: {e}")
-
-def write_pyragify_config(repo_path, output_dir, config_dir, category, repo_name):
-    import yaml
-    config = {
-        "repo_path": str(repo_path),
-        "output_dir": str(output_dir),
-        "max_words": 200000,
-        "max_file_size": 10485760,  # 10 MB
-        "skip_patterns": [".git"],
-        "skip_dirs": ["__pycache__", "node_modules"],
-        "verbose": False,
-    }
-    config_path = Path(config_dir) / f"pyragify_{category}_{repo_name}.yaml"
-    with open(config_path, "w") as f:
-        yaml.dump(config, f, default_flow_style=False, indent=2)
-    return config_path
+    build_txtai_index(config_path, base_path, embeddings_path, dry_run, category)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Build the knowledge base by cloning and chunking all repositories.")
+    parser = argparse.ArgumentParser(description="Build the knowledge base by cloning repositories and creating txtai embeddings.")
     parser.add_argument("--config", default="config/repositories.yml", help="Path to repository configuration file")
     parser.add_argument("--base-path", default="knowledge_base/raw", help="Base path for repositories")
-    parser.add_argument("--chunked-base", default="knowledge_base/chunked", help="Base path for chunked output")
+    parser.add_argument("--embeddings-path", default="knowledge_base/embeddings", help="Path for embeddings index")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be done without making changes")
     parser.add_argument("--category", help="Process only a specific category")
     parser.add_argument("--force-update", action="store_true", help="Update repositories if they already exist (git pull)")
-    parser.add_argument("--config-dir", default="config", help="Directory to store pyragify config files")
     args = parser.parse_args()
 
     build_pipeline(
         config_path=args.config,
         base_path=args.base_path,
-        chunked_base=args.chunked_base,
+        embeddings_path=args.embeddings_path,
         dry_run=args.dry_run,
         category=args.category,
-        force_update=args.force_update,
-        config_dir=args.config_dir
+        force_update=args.force_update
     )
