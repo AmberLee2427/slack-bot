@@ -60,6 +60,18 @@ microlensing_tools:
     description: "Minimization routine based on the algorithm A. Gould wrote in Fortran for minimizing chi2."
 
 general_tools:
+  - name: emcee
+    url: https://github.com/dfm/emcee.git
+    description: "The Python ensemble sampling toolkit for affine-invariant MCMC."
+
+  - name: dynesty
+    url: https://github.com/joshspeagle/dynesty.git
+    description: "A dynamic nested sampling package for computing Bayesian evidence"
+
+  - name: corner
+    url: https://github.com/dfm/corner.py.git
+    description: "The Python corner package: making corner plots in Python."
+
   - name: spacekit
     url: https://github.com/spacetelescope/spacekit.git
     description: "Python package for astronomical machine learning and data science"

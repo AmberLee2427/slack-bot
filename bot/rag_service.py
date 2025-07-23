@@ -30,6 +30,9 @@ class RAGService:
         self.repo_config = None
         self._load_config()
         self._load_embeddings()
+        self.model_weights_path = Path(embeddings_path).parent / "model_weights.yaml"
+        self.model_weights = self._load_model_weights()
+        self.extension_weights = self._load_extension_weights()
     
     def _load_config(self):
         """Load the repositories configuration."""
@@ -93,6 +96,25 @@ class RAGService:
         except Exception as e:
             logger.error(f"Failed to load embeddings: {e}")
     
+    def _load_model_weights(self):
+        if self.model_weights_path.exists():
+            try:
+                with open(self.model_weights_path, "r") as f:
+                    return yaml.safe_load(f) or {}
+            except Exception as e:
+                logger.warning(f"Failed to load model weights: {e}")
+        return {}
+    
+    def _load_extension_weights(self):
+        weights_path = Path(__file__).parent.parent / "config/weights.yaml"
+        if weights_path.exists():
+            try:
+                with open(weights_path, "r") as f:
+                    return yaml.safe_load(f) or {}
+            except Exception as e:
+                logger.warning(f"Failed to load weights: {e}")
+        return {}
+    
     def search(self, query: str, limit: int = 5) -> List[Dict[str, str]]:
         """
         Search for relevant documents.
@@ -109,20 +131,42 @@ class RAGService:
             return []
         
         try:
-            results = self.embeddings.search(query, limit)
-            
+            results = self.embeddings.search(query, limit * 50)  # much larger candidate pool for reweighting
             # Convert to list of dicts for easier handling
             formatted_results = []
+            # Load weights config
+            weights_cfg = self.extension_weights or {}
+            ext_weights = weights_cfg.get('extensions', {})
+            path_includes = weights_cfg.get('path_includes', {})
             for result in results:
+                doc_id = result['id']
+                ext = Path(doc_id).suffix
+                weight = ext_weights.get(ext, 1.0)
+                doc_id_lower = doc_id.lower()
+                for keyword, mult in path_includes.items():
+                    if keyword.lower() in doc_id_lower:
+                        weight *= mult
+                # Model weight
+                model_score = self.model_weights.get(doc_id, 1.0)
+                try:
+                    model_score = float(model_score)
+                except Exception:
+                    model_score = 1.0
+                model_score = max(0.5, min(model_score, 2.0))
+                adjusted_score = weight * model_score * result.get('score', 0.0)
+                #print(f"doc_id: {doc_id}, raw_score: {result.get('score', 0.0)}, weight: {weight}, model_score: {model_score}, adjusted_score: {adjusted_score}")
                 formatted_results.append({
-                    'id': result['id'],
+                    'id': doc_id,
                     'text': result['text'],
-                    'score': result.get('score', 0.0)
+                    'score': result.get('score', 0.0),
+                    'extension_weight': weight,
+                    'model_score': model_score,
+                    'adjusted_score': adjusted_score
                 })
-            
-            logger.info(f"Found {len(formatted_results)} results for query: '{query}'")
-            return formatted_results
-            
+            # Sort by adjusted_score, descending
+            formatted_results.sort(key=lambda r: r['adjusted_score'], reverse=True)
+            logger.info(f"Found {len(formatted_results)} results for query: '{query}' (sorted by adjusted_score)")
+            return formatted_results[:limit]
         except Exception as e:
             logger.error(f"Search failed: {e}")
             return []
@@ -138,7 +182,7 @@ class RAGService:
         Returns:
             Formatted context string
         """
-        results = self.search(query, limit=3)
+        results = self.search(query, limit=5)
         
         if not results:
             return "No relevant information found."
@@ -152,8 +196,6 @@ class RAGService:
             
             # Truncate text if needed (allow more content per document)
             text = result['text']
-            if len(text) > 1000:  # Increased from 500 to 1000
-                text = text[:1000] + "..."
             
             # Add document info with GitHub link
             if github_url:
@@ -225,8 +267,6 @@ class RAGService:
             
             # Allow much more content per document
             text = result['text']
-            if len(text) > 2000:  # Increased to 2000 chars per document
-                text = text[:2000] + "..."
             
             # Add document info with GitHub link
             if github_url:

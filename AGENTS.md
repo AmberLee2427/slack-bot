@@ -13,15 +13,12 @@ slack-bot/
 │   │   ├── src/txtai/           # Core txtai library (modifiable)
 │   │   ├── examples/            # txtai examples and tutorials
 │   │   └── docs/                # txtai documentation
-│   ├── pyragify/                # Repository processing tool
-│   │   ├── src/pyragify/        # Core pyragify library (modifiable)
-│   │   └── config.yaml          # Processing configuration
 │   └── slack-machine/           # Slack bot framework
 │       ├── src/machine/         # Core slack-machine library (modifiable)
 │       ├── docs/                # Framework documentation
 │       ├── tests/               # Framework tests
 │       └── pyproject.toml       # Framework dependencies
-├── knowledge_base/              # Three-stage data pipeline
+├── knowledge_base/              # Two-stage data pipeline
 │   ├── raw/                     # Original repositories and resources
 │   │   ├── microlensing_tools/  # Open source microlensing analysis tools
 │   │   ├── jupyter_notebooks/   # Microlensing analysis notebooks
@@ -29,13 +26,6 @@ slack-bot/
 │   │   ├── general_tools/       # Roman and general astronomy tools
 │   │   ├── web_resources/       # Microlensing Source and other web content
 │   │   └── journal_articles/    # Microlensing research papers
-│   ├── chunked/                 # Output from pyragify processing
-│   │   ├── microlensing_tools/  # Chunked Python code and docs
-│   │   ├── jupyter_notebooks/   # Chunked notebooks and examples
-│   │   ├── microlens_submit/    # Chunked submission tool docs
-│   │   ├── general_tools/       # Chunked Roman/astro code and docs
-│   │   ├── web_resources/       # Chunked web content
-│   │   └── journal_articles/    # Chunked research papers
 │   └── embeddings/              # txtai embeddings database
 │       ├── embeddings.sqlite    # Vector database (txtai default)
 │       ├── config.yml           # txtai configuration
@@ -48,10 +38,10 @@ slack-bot/
 │   ├── config/                  # Bot configuration
 │   └── utils/                   # Utility functions
 ├── docs/                        # Your bot documentation
-├── test/                        # testing script and environment stuff
+├── tests/                       # Testing scripts and environment
 ├── pyproject.toml               # Your bot dependencies
 ├── local_settings.py            # Bot configuration (not in git)
-├── .gitignore                   # Git ignore rules (includes knowledge_base/raw and knowledge_base/chunked)
+├── .gitignore                   # Git ignore rules (includes knowledge_base/raw)
 └── AGENTS.md                    # This file - AI agent guide
 ```
 
@@ -63,13 +53,7 @@ slack-bot/
 - **Documents**: PDFs, markdown files, etc.
 - **Purpose**: Original, unprocessed source material
 
-### Stage 2: Chunked Content (`knowledge_base/chunked/`)
-- **Processed by**: pyragify
-- **Output**: Semantic chunks of code, documentation, and text
-- **Format**: `.txt` files organized by content type (python/, markdown/, other/)
-- **Purpose**: LLM-friendly chunks ready for embedding
-
-### Stage 3: Embeddings Database (`knowledge_base/embeddings/`)
+### Stage 2: Embeddings Database (`knowledge_base/embeddings/`)
 - **Processed by**: txtai
 - **Output**: Vector embeddings and searchable database
 - **Format**: SQLite database with vector indexes
@@ -79,10 +63,9 @@ slack-bot/
 
 ###1. Core Libraries (Modifiable)
 - **txtai**: Embeddings database for semantic search and RAG
-- **pyragify**: Processes repositories into LLM-friendly chunks
 - **slack-machine**: Slack bot framework with plugin system
 
-### 2. Kowledge Base Sources
+### 2. Knowledge Base Sources
 The bot will ingest and process the following resources:
 
 #### Microlensing Analysis Tools
@@ -108,10 +91,10 @@ The bot will ingest and process the following resources:
 ### 3. Bot Architecture
 
 #### RAG Pipeline
-1. **Repository Processing**: Use pyragify to chunk repositories into semantic units
-2. **Embedding Generation**: Use txtai to create embeddings for all chunks
+1. **Repository Processing**: Use txtai to directly index raw repositories and files
+2. **Embedding Generation**: Use txtai to create embeddings for all content
 3. **Query Processing**: Convert user questions to embeddings
-4. **Semantic Search**: Find most relevant chunks from knowledge base
+4. **Semantic Search**: Find most relevant content from knowledge base
 5. **Response Generation**: Use retrieved context to generate accurate responses
 
 #### Slack Integration
@@ -132,24 +115,16 @@ cd slack-bot
 uv sync
 ```
 
-### 2 Knowlege Base Population
+### 2. Knowledge Base Population
 ```bash
 # Stage 1: Clone raw repositories
 git clone https://github.com/example/microlensing-tool knowledge_base/raw/microlensing_tools/
 git clone https://github.com/example/microlens-submit knowledge_base/raw/microlens_submit/
 # ... repeat for all repositories
 
-# Stage 2: Process with pyragify
-python -m pyragify --repo-path knowledge_base/raw/microlensing_tools --output-dir knowledge_base/chunked/microlensing_tools
-python -m pyragify --repo-path knowledge_base/raw/microlens_submit --output-dir knowledge_base/chunked/microlens_submit
-# ... repeat for all repositories
-
-# Stage 3: Create embeddings with txtai
-python -c 
-import txtai
-embeddings = txtai.Embeddings()
-embeddings.index([open(f).read() for f in glob.glob(knowledge_base/chunked/**/*.txt', recursive=true])
-embeddings.save('knowledge_base/embeddings/')
+# Stage 2: Create embeddings with txtai
+python scripts/build_knowledge_base.py --category microlens_submit
+# ... repeat for all categories
 ```
 
 ### 3. Bot Development
@@ -166,7 +141,7 @@ class MicrolensingRAGPlugin(MachineBasePlugin):
     
     async def handle_microlensing_question(self, msg, question):
         # RAG pipeline: search -> retrieve -> respond
-        results = self.embeddings.search(question, 5
+        results = self.embeddings.search(question, 5)
         context = self.build_context(results)
         response = self.generate_response(question, context)
         await msg.say(response)
@@ -196,11 +171,11 @@ class MicrolensingRAGPlugin(MachineBasePlugin):
 
 ## Technical Considerations
 
-### 1. Knowledgege Base Management
+### 1. Knowledge Base Management
 - **Incremental Updates**: Process new repositories as they're added
 - **Version Control**: Track changes to knowledge base
 - **Quality Control**: Ensure processed content is accurate and relevant
-- **Git Strategy**: Only commit embeddings database, ignore raw and chunked data
+- **Git Strategy**: Only commit embeddings database, ignore raw data
 
 ### 2. Response Quality
 - **Citation Support**: Provide sources for responses
@@ -222,30 +197,24 @@ Ensuring the accuracy, relevance, and reliability of the bot's responses is crit
 * **Content Relevance**: Ensure raw data directly pertains to microlensing analysis, data challenge procedures, Roman Research Nexus usage, or relevant scientific background.
 * **Categorization**: Maintain clear distinctions between `microlensing_tools`, `journal_articles`, `web_resources`, etc., to facilitate targeted checks and content updates.
 
-#### 4.2. Chunking Optimization (`knowledge_base/chunked/`)
-
-* **Semantic Cohesion**: Tune `pyragify`'s configuration (`config.yaml`) to ensure that generated text chunks are semantically coherent and do not awkwardly split sentences, paragraphs, or code blocks.
-* **Manual Review**: Conduct periodic manual spot-checks of sample `chunked` files to identify and correct any recurring structural or formatting issues introduced during processing.
-* **Metadata Integrity**: Verify that essential metadata (e.g., source file, URL, title, section) is either carried into the chunk content or stored separately for accurate citation.
-
-#### 4.3. Embeddings and Index Validation (`knowledge_base/embeddings/`)
+#### 4.2. Embeddings and Index Validation (`knowledge_base/embeddings/`)
 
 * **Model Suitability**: Evaluate the chosen embeddings model (e.g., `all-MiniLM-L6-v2`) for its performance on microlensing-specific vocabulary and concepts. Consider fine-tuning or selecting a more domain-specific model if search relevance is insufficient.
-* **Relevance Testing (Golden Queries)**: Develop a set of "golden" test queries with known expected relevant chunks. Regularly run these queries against the `txtai` embeddings database.
-* **Search Result Evaluation**: Manually inspect the top-retrieved chunks for each test query to assess their relevance and identify any irrelevant or missing information. Iterate on chunking parameters or embedding models if necessary.
+* **Relevance Testing (Golden Queries)**: Develop a set of "golden" test queries with known expected relevant content. Regularly run these queries against the `txtai` embeddings database.
+* **Search Result Evaluation**: Manually inspect the top-retrieved content for each test query to assess their relevance and identify any irrelevant or missing information. Iterate on embedding models if necessary.
 
-#### 4.4. Response Quality and Monitoring (Bot Output)
+#### 4.3. Response Quality and Monitoring (Bot Output)
 
 * **Prompt Engineering**: Craft precise LLM prompts that instruct the model to:
     * Strictly ground responses in the provided `txtai` retrieved context.
-    * Clearly cite sources from the retrieved chunks.
+    * Clearly cite sources from the retrieved content.
     * Express uncertainty or state when information is not found within the knowledge base rather than fabricating.
 * **Human Feedback Loop**: Implement mechanisms (e.g., simple Slack reactions like 👍/👎 or a dedicated feedback channel) to gather user input on the bot's responses.
 * **Continuous Monitoring**: Regularly review bot interactions for:
     * Accuracy of answers.
     * Instances of hallucination or off-topic responses.
     * Repeated questions that the bot struggles with, indicating gaps in the knowledge base or prompt engineering.
-* **Iterative Improvement**: Use monitoring and feedback to drive continuous improvement of the knowledge base, chunking strategy, embeddings models, and LLM prompts.
+* **Iterative Improvement**: Use monitoring and feedback to drive continuous improvement of the knowledge base, embeddings models, and LLM prompts.
 
 ## Deployment Considerations
 
@@ -274,23 +243,22 @@ Ensuring the accuracy, relevance, and reliability of the bot's responses is crit
 
 ### Files to Ignore
 - `knowledge_base/raw/` - Large repository clones
-- `knowledge_base/chunked/` - Intermediate processing output
 - `local_settings.py` - Sensitive configuration
 - Model caches and temporary files
 
 ## Next Steps for AI Agents
 
 1. **Review the existing code structure** in `src/` directories
-2. **Understand the RAG pipeline** by examining txtai and pyragify source
+2. **Understand the RAG pipeline** by examining txtai source
 3. **Plan the knowledge base structure** for microlensing resources
 4. **Design the bot plugins** for different types of interactions
-5Implement the core RAG functionality** using the modified libraries
+5. **Implement the core RAG functionality** using the modified libraries
 6. **Test with sample microlensing questions** and refine responses
 7. **Deploy and monitor** the bot in the data challenge Slack workspace
 
 ## Important Notes
 
-- **All libraries are modifiable**: You can customize txtai, pyragify, and slack-machine as needed
+- **All libraries are modifiable**: You can customize txtai and slack-machine as needed
 - **Focus on accuracy**: Microlensing is a specialized field, so responses must be precise
 - **User experience**: The bot should be helpful and not overwhelming
 - **Continuous improvement**: Update knowledge base and responses based on user feedback

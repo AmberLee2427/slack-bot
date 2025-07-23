@@ -86,6 +86,13 @@ def build_txtai_index(config_path: str, base_path: str = "knowledge_base/raw", e
         "backend": "faiss"
     })
 
+    # Load extension weights from YAML
+    try:
+        with open("config/index_weights.yaml", "r") as f:
+            ext_weights = yaml.safe_load(f)
+    except Exception:
+        ext_weights = {}
+
     categories = [category] if category else list(config.keys())
     documents = []
     
@@ -115,6 +122,9 @@ def build_txtai_index(config_path: str, base_path: str = "knowledge_base/raw", e
             # Skip common directories
             skip_dirs = {'.git', '.github', '__pycache__', 'node_modules', '.pytest_cache', '.mypy_cache'}
             text_files = [f for f in text_files if not any(skip in f.parts for skip in skip_dirs)]
+
+            # Skip Sphinx build files and .rst.txt artifacts
+            text_files = [f for f in text_files if 'docs/build' not in str(f) and not str(f).endswith('.rst.txt')]
             
             for file_path in text_files:
                 try:
@@ -128,8 +138,8 @@ def build_txtai_index(config_path: str, base_path: str = "knowledge_base/raw", e
                     # Create document ID
                     doc_id = f"{cat}/{repo_name}/{file_path.relative_to(repo_dir)}"
                     
-                    # Add to documents list
-                    documents.append((doc_id, content, None))
+                    # Add to documents list (no score)
+                    documents.append((doc_id, content))
                     logger.debug(f"Added {doc_id} ({len(content)} chars)")
                     
                 except Exception as e:

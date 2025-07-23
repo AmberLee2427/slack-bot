@@ -34,7 +34,7 @@ def test_rag_service():
         
         # Test queries
         test_queries = [
-            "microlensing validation",
+            "submission validation",
             "submission dossier",
             "parameter validation",
             "CLI commands"
@@ -44,16 +44,16 @@ def test_rag_service():
             print(f"Query: '{query}'")
             
             # Test search
-            results = rag.search(query, limit=2)
+            results = rag.search(query, limit=5)
             print(f"  Found {len(results)} results:")
             for i, result in enumerate(results, 1):
                 print(f"    {i}. {result['id']} (score: {result['score']:.3f})")
-                print(f"       {result['text'][:100]}...")
+                print(f"       {result['text'][:2000]}...")
             
             # Test context
             context = rag.get_context_for_query(query)
             print(f"  Context length: {len(context)} chars")
-            print(f"  Context preview: {context[:150]}...")
+            print(f"  Context preview: {context[:2000]}...")
             
             # Test AI-ready results
             ai_results = rag.get_raw_results_for_ai(query, limit=1)
