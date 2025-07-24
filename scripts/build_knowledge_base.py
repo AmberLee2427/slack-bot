@@ -11,6 +11,12 @@ import logging
 import argparse
 import json
 
+# Add import for nb4llm
+try:
+    from nb4llm import convert_ipynb_to_txt
+except ImportError:
+    convert_ipynb_to_txt = None
+
 def clone_repositories(config_path: str, base_path: str = "knowledge_base/raw", dry_run: bool = False, category: str = None, force_update: bool = False) -> None:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
@@ -113,10 +119,25 @@ def build_txtai_index(config_path: str, base_path: str = "knowledge_base/raw", e
             if dry_run:
                 logger.info(f"[DRY RUN] Would process files in {repo_dir}")
                 continue
-            
-            # Collect all text files
+
+            # --- nb4llm notebook conversion step ---
+            if convert_ipynb_to_txt is not None:
+                for ipynb_file in repo_dir.rglob("*.ipynb"):
+                    txt_file = ipynb_file.with_suffix(".txt")
+                    # Only convert if .txt does not exist or is older than .ipynb
+                    if not txt_file.exists() or ipynb_file.stat().st_mtime > txt_file.stat().st_mtime:
+                        try:
+                            logger.info(f"Converting {ipynb_file} to {txt_file} using nb4llm...")
+                            convert_ipynb_to_txt(str(ipynb_file), str(txt_file))
+                        except Exception as e:
+                            logger.warning(f"Failed to convert {ipynb_file} to txt: {e}")
+            else:
+                logger.warning("nb4llm not available. Skipping notebook conversion.")
+            # --- end nb4llm notebook conversion step ---
+
+            # Collect all text files (including .ipynb and .txt)
             text_files = []
-            for ext in ['.py', '.md', '.txt', '.rst', '.yaml', '.yml', '.json']:
+            for ext in ['.py', '.md', '.txt', '.rst', '.yaml', '.yml', '.json', '.ipynb']:
                 text_files.extend(repo_dir.rglob(f"*{ext}"))
             
             # Skip common directories

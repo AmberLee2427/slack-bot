@@ -1,3 +1,4 @@
 -e src/txtai
 -e src/pyragify
 -e src/slack-machine
+-e src/nb4llm

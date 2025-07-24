@@ -29,6 +29,7 @@ dependencies:
       - txtai
       - faiss-cpu
       - sentence-transformers
+      - nb4llm
       
       # For pyragify (repo chunking)
       - omegaconf>=2.3.0

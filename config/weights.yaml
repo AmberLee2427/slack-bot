@@ -3,11 +3,11 @@ extensions:
   .py: 1.0
   .md: 0.98
   .rst: 0.9
-  .txt: 0.9
+  .txt: 1.0
   .yaml: 0.9
   .yml: 0.9
   .json: 0.9
-  .ipynb: 1.0
+  .ipynb: 0.1
 
 path_includes:
   example: 1.1
