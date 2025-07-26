@@ -70,6 +70,7 @@ slack-bot/
 - **Chunking**: The pipeline currently embeds whole files; chunking strategies may be revisited for better granularity.
 - **Build artifacts**: Extension/path-based weighting helps, but further filtering or smarter indexing may be needed.
 - **nb4llm integration**: The intent is to make nb4llm a standard part of the pipeline for all notebook sources.
+- **Pipeline refactor needed**: Refactor pipeline logic (currently in scripts/) into an importable package/module for easier testing and reuse.
 
 ## Development Workflow (Updated)
 

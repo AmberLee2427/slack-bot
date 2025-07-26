@@ -3,13 +3,11 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  # Core Python version
-  - python=3.11
-
-  # Core bot and RAG dependencies
+  - python=3.13
   - pip
   - git
-  - pyyaml
+  - pyyaml>=5.3
+  - regex>=2022.8.17
   - dill
   - apscheduler
   - slack-sdk
@@ -20,25 +18,18 @@ dependencies:
   - pydantic
   - structlog
   - multidict
-
-  # For txtai (semantic search, embeddings)
+  - pytest
+  - coverage
   - pip:
-      # Core ML dependencies for txtai
-      - torch
-      - transformers
-      - txtai
-      - faiss-cpu
+      - torch>=1.12.1
+      - faiss-cpu>=1.7.1.post2
       - sentence-transformers
+      - transformers==4.36.2
+      - txtai
       - nb4llm
-      
-      # For pyragify (repo chunking)
       - omegaconf>=2.3.0
       - pathspec>=0.12.1
       - typer>=0.15.1
 
-      # For development/testing
-      - pytest
-      - coverage
-
-# Optional: If you want to use local editable installs for your own src/ packages,
-# add pip install -e ../src/yourpackage in a post-build step or requirements file.
+# MacOS users: If you see OpenMP/libomp errors, run: brew install libomp
+# If you see "KMP_DUPLICATE_LIB_OK" errors, set: export KMP_DUPLICATE_LIB_OK=TRUE
