@@ -1,6 +1,7 @@
 # Roman Galactic Exoplanet Survey - AI Assistant Bot
 
-[![Python3.9ttps://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+> AKA: Nancy
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 An intelligent Slack bot designed to support participants in the **Roman Galactic Exoplanet Survey - Project Infrastructure Team data challenge**. This bot leverages advanced AI techniques to provide context-aware assistance with microlensing analysis, data challenge procedures, and related tools.
@@ -16,7 +17,7 @@ The Roman mission will revolutionize our understanding of exoplanets through gra
 - **Reference research** papers and documentation
 - **Help with code** and data processing workflows
 
-## 🚀 Features
+## 🚀 Features (under active development)
 
 ### 🤖 Intelligent Responses
 - **Context-aware answers** based on comprehensive microlensing knowledge
@@ -45,12 +46,12 @@ The bot has access to:
 This bot is built using a sophisticated three-stage data pipeline:
 
 ```
-Raw Repositories → Chunked Content → Embeddings Database
-     ↓                ↓                    ↓
-  Git clones    pyragify processing   txtai embeddings
+Raw Repositories     →     Chunked Content     →      Embeddings Database
+     ↓                            ↓                            ↓
+  Git clones       TBD (currently chunking by file)     txtai embeddings
 ```
-1 Stage**: Original repositories and resources
-2**Chunked Stage**: Semantic chunks ready for AI processing
+1. **Raw Stage**: Original repositories and resources
+2. **Chunked Stage**: Semantic chunks ready for AI processing
 3. **Embeddings Stage**: Vector database for fast semantic search
 
 ## 🛠️ Setup & Installation
@@ -84,17 +85,14 @@ Raw Repositories → Chunked Content → Embeddings Database
      - `app_mentions:read`
      - `channels:history`
      - `commands`
+     - to do: fill in the rest of these, or create a manifest 
    - Copy your Bot Token and App Token
 
 4. **Create configuration**
-   ```bash
-   cp local_settings.py.example local_settings.py
-   ```
-   
-   Edit `local_settings.py`:
+   Edit/Create `bot/config/.env`:
    ```python
-   SLACK_APP_TOKEN = "xapp-your-app-token"
    SLACK_BOT_TOKEN = "xoxb-your-bot-token"
+   PLUGINS = ["bot.plugins.llm", "bot.plugins.rag"]
    ```
 
 5. **Build the knowledge base**
@@ -132,8 +130,8 @@ python scripts/build_knowledge_base.py --rebuild
 
 #### Creating Custom Plugins
 ```python
-from machine.plugins.base import MachineBasePlugin
-from machine.plugins.decorators import respond_to
+from bot.plugins.rag import rag_service
+import bot.plugins.llm as llm
 
 class CustomPlugin(MachineBasePlugin):
     @respond_to(rcustom command")
@@ -144,7 +142,6 @@ class CustomPlugin(MachineBasePlugin):
 ## 🔧 Configuration
 
 ### Environment Variables
-- `SLACK_APP_TOKEN`: Your Slack app token
 - `SLACK_BOT_TOKEN`: Your Slack bot token
 - `KNOWLEDGE_BASE_PATH`: Path to knowledge base (default: `knowledge_base/`)
 - `LOG_LEVEL`: Logging level (default: `INFO`)

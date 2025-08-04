@@ -144,3 +144,8 @@ knowledge_base/embeddings/
 # Model caches and temporary files
 knowledge_base/embeddings/models/
 *.sqlite-journal
+
+# Local stuff
+bot/config/*
+bot/config/.env
+.env

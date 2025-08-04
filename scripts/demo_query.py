@@ -6,7 +6,7 @@ from pathlib import Path
 import json
 import re
 
-from bot.rag_service import get_rag_service
+from bot.plugins.rag.rag_service import get_rag_service
 import yaml
 import difflib
 
@@ -21,7 +21,6 @@ else:
     print("RAG service is available.\n")
 
 print(f"Query: '{query}'\n\n")
-
 
 results = rag.search(query, limit=5)
 if debug:
