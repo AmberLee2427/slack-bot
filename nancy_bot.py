@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, Any
 import queue
 import threading
+import aiohttp
 
 # Fix OpenMP issue before importing any ML libraries
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -186,13 +187,89 @@ class NancyBot:
                         )
                 
                 # Generate response using RAG + LLM with callback
-                await self.generate_response_with_updates(clean_text, send_message, event.get("ts"))
+                # First, get conversation history for context
+                thread_ts = event.get("thread_ts")  # If this is in a thread
+                conversation_history = await self.get_conversation_history(
+                    channel=channel, 
+                    thread_ts=thread_ts, 
+                    limit=10
+                )
+                
+                logger.info(f"Fetched {len(conversation_history)} messages for context")
+                if conversation_history:
+                    logger.info(f"Sample conversation context: {conversation_history[-1] if conversation_history else 'None'}")
+                
+                await self.generate_response_with_updates(
+                    clean_text, 
+                    send_message, 
+                    event.get("ts"),
+                    conversation_history
+                )
         except Exception as e:
             logger.error(f"Error in process_message: {e}")
             return
     
-    async def generate_response_with_updates(self, query: str, send_callback, original_ts: str):
-        """Generate AI response with intermediate updates"""
+    async def get_conversation_history(self, channel: str, thread_ts: str = None, limit: int = 10) -> list:
+        """
+        Fetch recent conversation history from Slack.
+        Returns a list of messages with user info and timestamps.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            url = "https://slack.com/api/conversations.history"
+            headers = {"Authorization": f"Bearer {self.bot_token}"}
+            
+            params = {
+                "channel": channel,
+                "limit": limit,
+                "inclusive": True
+            }
+            
+            # If we're in a thread, get thread replies instead
+            if thread_ts:
+                url = "https://slack.com/api/conversations.replies"
+                params["ts"] = thread_ts
+                params["limit"] = limit
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if data.get("ok"):
+                            messages = data.get("messages", [])
+                            # Sort by timestamp (oldest first) and format for context
+                            formatted_messages = []
+                            for msg in sorted(messages, key=lambda x: float(x.get("ts", 0))):
+                                # Skip bot messages and system messages
+                                if msg.get("bot_id") or msg.get("subtype"):
+                                    continue
+                                    
+                                user_id = msg.get("user", "Unknown")
+                                text = msg.get("text", "")
+                                ts = msg.get("ts", "")
+                                
+                                formatted_messages.append({
+                                    "user": user_id,
+                                    "text": text,
+                                    "timestamp": ts
+                                })
+                            
+                            logger.info(f"Retrieved {len(formatted_messages)} conversation messages")
+                            return formatted_messages[-limit:]  # Return most recent N messages
+                        else:
+                            logger.error(f"Slack API error: {data.get('error', 'Unknown error')}")
+                    else:
+                        logger.error(f"HTTP error {response.status} fetching conversation history")
+            
+        except Exception as e:
+            logger.error(f"Error fetching conversation history: {e}", exc_info=True)
+            
+        return []  # Return empty list on error
+    
+    async def generate_response_with_updates(self, query: str, send_callback, original_ts: str, conversation_history: list = None):
+        """Generate AI response with intermediate updates and conversation context"""
         try:
             # Create a queue to collect messages from the LLM thread
             import queue
@@ -217,7 +294,8 @@ class NancyBot:
                 None, 
                 self.llm_service.call_llm_with_callback, 
                 query, 
-                sync_callback
+                sync_callback,
+                conversation_history
             )
             
             # Process messages from the queue as they arrive

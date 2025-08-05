@@ -102,11 +102,24 @@ class LLMService:
         #get the initial context
         return self.rag.get_context_for_query(query)
 
-    def construct_query_payload(self, query: str, context: str) -> dict:
+    def construct_query_payload(self, query: str, context: str, conversation_history: list = None) -> dict:
         # Compose the full prompt
-        full_prompt = (
-            f"{self.system_prompt}\n"
-            f"\n"
+        full_prompt = f"{self.system_prompt}\n\n"
+        
+        # Add conversation history if available
+        if conversation_history:
+            full_prompt += "Recent conversation history:\n"
+            for msg in conversation_history:
+                user_id = msg.get("user", "Unknown")
+                text = msg.get("text", "")
+                # Format user mentions nicely
+                if user_id.startswith("U"):
+                    full_prompt += f"<@{user_id}>: {text}\n"
+                else:
+                    full_prompt += f"{user_id}: {text}\n"
+            full_prompt += "\n"
+        
+        full_prompt += (
             f"You will have {self.max_turns} internalturns to answer the user's question.\n"
             f"\n"
             f"User query:\n"
@@ -167,13 +180,21 @@ class LLMService:
             logger.error(f"Exception in querry_llm: {e}")
             return None, None
 
-    def call_llm_with_callback(self, query: str, callback_fn):
+    def call_llm_with_callback(self, query: str, callback_fn, conversation_history: list = None):
         """
         Process a query with a callback function for sending intermediate updates.
         callback_fn(message: str, is_final: bool = False)
+        conversation_history: list of recent messages for context
         """
         import logging
         logger = logging.getLogger(__name__)
+        
+        # Log conversation history if provided
+        if conversation_history:
+            logger.info(f"Using conversation history with {len(conversation_history)} messages")
+            if self.debugging:
+                for i, msg in enumerate(conversation_history):
+                    logger.info(f"  Message {i+1}: {msg.get('user', 'Unknown')}: {msg.get('text', '')[:100]}...")
         
         # Initialize the turn variables
         payload = None
@@ -192,7 +213,7 @@ class LLMService:
 
         # Construct the initial payload
         logger.info("Constructing query payload")
-        payload = self.construct_query_payload(query, context)
+        payload = self.construct_query_payload(query, context, conversation_history)
 
         # Loop through the turns
         while searching and turn < self.max_turns:
@@ -336,10 +357,11 @@ class LLMService:
         if searching == False and turn >= self.max_turns:
             callback_fn("  :warning: _Reached thinking limit - providing available results_", True)
 
-    def call_llm(self, query: str) -> str:
+    def call_llm(self, query: str, conversation_history: list = None) -> str:
         """
         Process a query and return the final response.
         Collects all intermediate responses and returns the final compiled answer.
+        conversation_history: list of recent messages for context
         """
         # Initialize the turn variables
         payload = None
@@ -353,7 +375,7 @@ class LLMService:
         context = self.get_initial_context(query)
 
         # Construct the initial payload
-        payload = self.construct_query_payload(query, context)
+        payload = self.construct_query_payload(query, context, conversation_history)
 
         # Loop through the turns
         while searching and turn < self.max_turns:
