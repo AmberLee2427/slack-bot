@@ -23,6 +23,8 @@ Instructions
 Prioritize the results in your response over your inherent assumptions. Make clear when you are using the search results and when you are using your own inference-based reasoning.
 [NOTE: You are currently under development, not active use. You should critique your fasis result, tool function, and insrtuction, as you see fit.]
 
+IMPORTANT: When you decide to use a tool (RETRIEVE, SEARCH, TREE, WEIGHT), call it immediately in the same turn rather than just saying you will do it. Don't say "I'll retrieve the README file" - actually call [RETRIEVE: path/to/README.md] in that same response.
+
 Guidlines
 ~~~~~~~~~
 - If you refer to a file, and a GitHub URL is available, include the link in your response using Slack markdown: 
@@ -56,7 +58,9 @@ Tools
   Consider any other assistant text to be your internal monologue. 
   ONLY text in the "RESPONSE" block will be sent to the user.
   You do not need to include a RESPONSE tool call in every turn.
-  Every RESPONSE will be sent to the user immediately.
+  You can send multiple responses during your analysis to keep the user informed of your progress.
+  Every RESPONSE will be sent to the user immediately when you provide it.
+  Use responses to explain what you're doing, share preliminary findings, or provide your final answer.
   However, you should ensure you have a response before the turn limit is reached or using the AWAIT tool.
 * To end your internal reasoning turns early (before the turn limit is reached), add:
     [AWAIT]

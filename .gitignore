@@ -149,3 +149,5 @@ knowledge_base/embeddings/models/
 bot/config/*
 bot/config/.env
 .env
+
+SLACK.md

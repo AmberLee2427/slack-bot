@@ -4,12 +4,11 @@ This file contains the tools for the LLM.
 
 import re
 import difflib
-from slack_sdk import WebClient
 from pathlib import Path
 import yaml
 import os
 
-def search_tool(self, llm_text: str) -> str:
+def search_tool(self, llm_text: str, callback_fn=None) -> str:
     """
     This function handles the SEARCH tool.
     It extracts the search query from the LLM response and updates the meta prompt.
@@ -20,6 +19,10 @@ def search_tool(self, llm_text: str) -> str:
         if "SEARCH:" in line:
             search_content = line.split("SEARCH:")[1].strip()
             raw_query = search_content
+            
+            if callback_fn:
+                callback_fn(f"  🔍 Searching for: _{raw_query}_", False)
+            
             if raw_query.lower().startswith('select'):
                 query_part = raw_query
                 results = list(self.rag.embeddings.database.search(query_part))
@@ -30,6 +33,9 @@ def search_tool(self, llm_text: str) -> str:
                 # Remove the trailing ' limit N' (8 chars) from the end
                 query_part = raw_query[:-8]
                 results = self.rag.search(query_part, limit=llm_search_max_results)
+            
+            if callback_fn and results:
+                callback_fn(f"  📊 Found {len(results)} relevant sources", False)
                 
             # Update the context for the next turn
             meta_prompt += f"\n\nSearch results:\n{query_part}\n"
@@ -135,21 +141,30 @@ def retrieve_tool(self, file_path: str, context_files: set) -> tuple[str, set]:
     return meta_prompt, new_context_files
 
 
-def response_tool(self, llm_text: str):
+def response_tool(self, llm_text: str) -> str:
     """
     This function handles the response from the LLM.
-    It extracts the comment from the LLM response and sends it to Slack.
+    It extracts the comment from the LLM response and returns it for the bot to send.
     """
-    slack_client = WebClient(token=os.environ.get("SLACK_API_TOKEN"))
-    channel = os.environ.get("SLACK_CHANNEL")
-
+    import logging
+    logger = logging.getLogger(__name__)
+    
     # RESPONSE tool handler
     # Extract the comment from the LLM response
     # [BEGIN RESPONSE]
     # <comment>
     # [END RESPONSE]
+    if self.debugging:
+        logger.info(f"response_tool called with text length: {len(llm_text)}")
+        logger.info(f"Looking for pattern [BEGIN RESPONSE]...[END RESPONSE]")
+    
     match = re.search(r"\[BEGIN RESPONSE\](.*?)\[END RESPONSE\]", llm_text, re.DOTALL)
-    comment = match.group(1).strip() if match else None
-
-    # send comment to slack
-    slack_client.chat_postMessage(channel=channel, text=comment)
+    if match:
+        response_text = match.group(1).strip()
+        if self.debugging:
+            logger.info(f"Found response match: '{response_text}'")
+        return response_text
+    else:
+        if self.debugging:
+            logger.warning("No [BEGIN RESPONSE]...[END RESPONSE] pattern found in text")
+        return None

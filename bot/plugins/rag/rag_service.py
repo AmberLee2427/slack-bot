@@ -22,10 +22,10 @@ class RAGService:
             embeddings_path: Path to the txtai embeddings index
             config_path: Path to the repositories configuration file
         """
-        # Make path relative to project root (bot/ directory parent)
-        project_root = Path(__file__).parent.parent
-        self.embeddings_path = project_root / embeddings_path
-        self.config_path = project_root / config_path
+        # Use Nancy's base directory from environment variable
+        nancy_base = Path(os.environ.get("NANCY_BASE_DIR", "."))
+        self.embeddings_path = nancy_base / embeddings_path
+        self.config_path = nancy_base / config_path
         self.embeddings = None
         self.repo_config = None
         self._load_config()
