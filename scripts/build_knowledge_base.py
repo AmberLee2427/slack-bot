@@ -27,7 +27,7 @@ try:
 except ImportError:
     TIKA_AVAILABLE = False
 
-def download_pdf_articles(config_path: str, base_path: str = "knowledge_base/raw", dry_run: bool = False, category: str = None, force_update: bool = False) -> None:
+def download_pdf_articles(config_path: str, base_path: str = "knowledge_base/raw", dry_run: bool = False, category: str = None, force_update: bool = False) -> dict:
     """Download PDF articles from URLs"""
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
@@ -36,6 +36,14 @@ def download_pdf_articles(config_path: str, base_path: str = "knowledge_base/raw
         config = yaml.safe_load(f)
 
     categories = [category] if category else list(config.keys())
+    
+    # Track failures
+    failures = {
+        'failed_downloads': [],
+        'skipped_existing': [],
+        'successful_downloads': []
+    }
+    
     for cat in categories:
         articles = config.get(cat)
         if not isinstance(articles, list):
@@ -54,6 +62,7 @@ def download_pdf_articles(config_path: str, base_path: str = "knowledge_base/raw
                         continue
                 else:
                     logger.info(f"Article {cat}/{article_name}.pdf already exists, skipping.")
+                    failures['skipped_existing'].append(f"{cat}/{article_name}")
                     continue
             
             logger.info(f"Downloading {article_name} from {article_url} to {dest_file}...")
@@ -71,11 +80,15 @@ def download_pdf_articles(config_path: str, base_path: str = "knowledge_base/raw
                         f.write(chunk)
                         
                 logger.info(f"Successfully downloaded {article_name}")
+                failures['successful_downloads'].append(f"{cat}/{article_name}")
             except Exception as e:
                 logger.error(f"Failed to download {article_name}: {e}")
+                failures['failed_downloads'].append(f"{cat}/{article_name}: {str(e)}")
+
+    return failures
 
 
-def clone_repositories(config_path: str, base_path: str = "knowledge_base/raw", dry_run: bool = False, category: str = None, force_update: bool = False) -> None:
+def clone_repositories(config_path: str, base_path: str = "knowledge_base/raw", dry_run: bool = False, category: str = None, force_update: bool = False) -> dict:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
 
@@ -83,6 +96,16 @@ def clone_repositories(config_path: str, base_path: str = "knowledge_base/raw", 
         config = yaml.safe_load(f)
 
     categories = [category] if category else list(config.keys())
+    
+    # Track failures  
+    failures = {
+        'failed_clones': [],
+        'failed_updates': [],
+        'skipped_existing': [],
+        'successful_clones': [],
+        'successful_updates': []
+    }
+    
     for cat in categories:
         repos = config.get(cat)
         if not isinstance(repos, list):
@@ -103,10 +126,13 @@ def clone_repositories(config_path: str, base_path: str = "knowledge_base/raw", 
                         current_branch = result.stdout.strip()
                         subprocess.run(["git", "pull", "origin", current_branch], cwd=str(dest_dir), check=True, capture_output=True, text=True)
                         logger.info(f"Successfully updated {repo_name}")
+                        failures['successful_updates'].append(f"{cat}/{repo_name}")
                     except subprocess.CalledProcessError as e:
                         logger.error(f"Failed to update {repo_name}: {e.stderr}")
+                        failures['failed_updates'].append(f"{cat}/{repo_name}: {e.stderr}")
                 else:
                     logger.info(f"Repository {cat}/{repo_name} already exists, skipping.")
+                    failures['skipped_existing'].append(f"{cat}/{repo_name}")
             else:
                 logger.info(f"Cloning {repo_name} from {repo_url} into {dest_dir}...")
                 if dry_run:
@@ -121,11 +147,15 @@ def clone_repositories(config_path: str, base_path: str = "knowledge_base/raw", 
                         text=True
                     )
                     logger.info(f"Successfully cloned {repo_name}")
+                    failures['successful_clones'].append(f"{cat}/{repo_name}")
                 except subprocess.CalledProcessError as e:
                     logger.error(f"Failed to clone {repo_name}: {e.stderr}")
+                    failures['failed_clones'].append(f"{cat}/{repo_name}: {e.stderr}")
+
+    return failures
 
 
-def build_txtai_index(config_path: str, articles_config_path: str = None, base_path: str = "knowledge_base/raw", embeddings_path: str = "knowledge_base/embeddings", dry_run: bool = False, category: str = None) -> None:
+def build_txtai_index(config_path: str, articles_config_path: str = None, base_path: str = "knowledge_base/raw", embeddings_path: str = "knowledge_base/embeddings", dry_run: bool = False, category: str = None) -> dict:
     """Build txtai embeddings index directly from raw files and PDFs"""
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
@@ -177,6 +207,18 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
     categories = [category] if category else list(config.keys())
     documents = []
     
+    # Track failures
+    failures = {
+        'failed_text_files': [],
+        'failed_pdf_files': [],
+        'failed_notebook_conversions': [],
+        'successful_text_files': 0,
+        'successful_pdf_files': 0,
+        'successful_notebook_conversions': 0,
+        'skipped_repositories': [],
+        'skipped_articles': []
+    }
+    
     # Process repository files
     for cat in categories:
         repos = config.get(cat)
@@ -188,6 +230,7 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
             
             if not repo_dir.exists():
                 logger.warning(f"Repository directory {repo_dir} does not exist. Skipping {cat}/{repo_name}.")
+                failures['skipped_repositories'].append(f"{cat}/{repo_name}")
                 continue
                 
             logger.info(f"Processing {cat}/{repo_name}...")
@@ -205,8 +248,10 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
                         try:
                             logger.info(f"Converting {ipynb_file} to {txt_file} using nb4llm...")
                             convert_ipynb_to_txt(str(ipynb_file), str(txt_file))
+                            failures['successful_notebook_conversions'] += 1
                         except Exception as e:
                             logger.warning(f"Failed to convert {ipynb_file} to txt: {e}")
+                            failures['failed_notebook_conversions'].append(f"{ipynb_file}: {str(e)}")
             else:
                 logger.warning("nb4llm not available. Skipping notebook conversion.")
             # --- end nb4llm notebook conversion step ---
@@ -244,9 +289,11 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
                     # Add to documents list (no score)
                     documents.append((doc_id, content))
                     logger.debug(f"Added {doc_id} ({len(content)} chars)")
+                    failures['successful_text_files'] += 1
                     
                 except Exception as e:
                     logger.warning(f"Error reading {file_path}: {e}")
+                    failures['failed_text_files'].append(f"{file_path}: {str(e)}")
             
             # Process PDF files found in repository
             for pdf_path in pdf_files:
@@ -266,11 +313,14 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
                         # Add to documents list
                         documents.append((doc_id, full_content))
                         logger.info(f"Added repository PDF {doc_id} ({len(content)} chars)")
+                        failures['successful_pdf_files'] += 1
                     else:
                         logger.warning(f"Failed to extract meaningful text from repository PDF {pdf_path}")
+                        failures['failed_pdf_files'].append(f"{pdf_path}: No meaningful text extracted")
                         
                 except Exception as e:
                     logger.error(f"Error processing repository PDF {pdf_path}: {e}")
+                    failures['failed_pdf_files'].append(f"{pdf_path}: {str(e)}")
     
     # Process PDF articles
     article_categories = [category] if category else list(articles_config.keys())
@@ -284,6 +334,7 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
             
             if not pdf_file.exists():
                 logger.warning(f"PDF file {pdf_file} does not exist. Skipping {cat}/{article_name}.")
+                failures['skipped_articles'].append(f"{cat}/{article_name}")
                 continue
                 
             logger.info(f"Processing PDF {cat}/{article_name}...")
@@ -309,13 +360,17 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
                         # Add to documents list
                         documents.append((doc_id, full_content))
                         logger.info(f"Added PDF {doc_id} ({len(content)} chars)")
+                        failures['successful_pdf_files'] += 1
                     else:
                         logger.warning(f"Failed to extract meaningful text from {pdf_file}")
+                        failures['failed_pdf_files'].append(f"{pdf_file}: No meaningful text extracted")
                         
                 except Exception as e:
                     logger.error(f"Error processing PDF {pdf_file}: {e}")
+                    failures['failed_pdf_files'].append(f"{pdf_file}: {str(e)}")
             else:
                 logger.warning(f"Tika not available. Skipping PDF {pdf_file}")
+                failures['failed_pdf_files'].append(f"{pdf_file}: Tika not available")
     
     if documents:
         logger.info(f"Indexing {len(documents)} documents...")
@@ -334,22 +389,34 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
     else:
         logger.warning("No documents found to index")
 
+    return failures
+
 
 def build_pipeline(config_path: str, articles_config_path: str = None, base_path: str = "knowledge_base/raw", embeddings_path: str = "knowledge_base/embeddings", dry_run: bool = False, category: str = None, force_update: bool = False, dirty: bool = False) -> None:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
     
+    # Track all failures across stages
+    all_failures = {
+        'repos': {},
+        'articles': {},
+        'indexing': {}
+    }
+    
     # Clone repositories
-    clone_repositories(config_path, base_path, dry_run, category, force_update)
+    repo_failures = clone_repositories(config_path, base_path, dry_run, category, force_update)
+    all_failures['repos'] = repo_failures
     
     # Download PDF articles if config provided
     if articles_config_path and os.path.exists(articles_config_path):
-        download_pdf_articles(articles_config_path, base_path, dry_run, category, force_update)
+        article_failures = download_pdf_articles(articles_config_path, base_path, dry_run, category, force_update)
+        all_failures['articles'] = article_failures
     elif articles_config_path:
         logger.warning(f"Articles config file {articles_config_path} not found. Skipping PDF downloads.")
     
     # Build embeddings index including both repos and PDFs
-    build_txtai_index(config_path, articles_config_path, base_path, embeddings_path, dry_run, category)
+    indexing_failures = build_txtai_index(config_path, articles_config_path, base_path, embeddings_path, dry_run, category)
+    all_failures['indexing'] = indexing_failures
     
     # Cleanup downloaded files
     if not dirty and not dry_run:
@@ -359,6 +426,126 @@ def build_pipeline(config_path: str, articles_config_path: str = None, base_path
             cleanup_pdf_articles(articles_config_path, base_path, category)
     elif dry_run and not dirty:
         logger.info("[DRY RUN] Would clean up raw repositories and PDFs after processing")
+    
+    # Print comprehensive summary
+    print_pipeline_summary(all_failures, dry_run)
+
+
+def print_pipeline_summary(all_failures: dict, dry_run: bool = False) -> None:
+    """Print a comprehensive summary of the pipeline execution"""
+    logger = logging.getLogger(__name__)
+    
+    prefix = "[DRY RUN] " if dry_run else ""
+    
+    logger.info("=" * 60)
+    logger.info(f"{prefix}KNOWLEDGE BASE PIPELINE SUMMARY")
+    logger.info("=" * 60)
+    
+    # Repository summary
+    repo_failures = all_failures.get('repos', {})
+    if repo_failures:
+        logger.info("\n📁 REPOSITORIES:")
+        if repo_failures.get('successful_clones'):
+            logger.info(f"  ✅ Successfully cloned: {len(repo_failures['successful_clones'])}")
+            for repo in repo_failures['successful_clones']:
+                logger.info(f"     - {repo}")
+        
+        if repo_failures.get('successful_updates'):
+            logger.info(f"  🔄 Successfully updated: {len(repo_failures['successful_updates'])}")
+            for repo in repo_failures['successful_updates']:
+                logger.info(f"     - {repo}")
+        
+        if repo_failures.get('skipped_existing'):
+            logger.info(f"  ⏭️  Skipped (already exists): {len(repo_failures['skipped_existing'])}")
+            
+        if repo_failures.get('failed_clones'):
+            logger.info(f"  ❌ Failed to clone: {len(repo_failures['failed_clones'])}")
+            for failure in repo_failures['failed_clones']:
+                logger.info(f"     - {failure}")
+                
+        if repo_failures.get('failed_updates'):
+            logger.info(f"  ❌ Failed to update: {len(repo_failures['failed_updates'])}")
+            for failure in repo_failures['failed_updates']:
+                logger.info(f"     - {failure}")
+    
+    # Articles summary
+    article_failures = all_failures.get('articles', {})
+    if article_failures:
+        logger.info("\n📚 PDF ARTICLES:")
+        if article_failures.get('successful_downloads'):
+            logger.info(f"  ✅ Successfully downloaded: {len(article_failures['successful_downloads'])}")
+            for article in article_failures['successful_downloads']:
+                logger.info(f"     - {article}")
+        
+        if article_failures.get('skipped_existing'):
+            logger.info(f"  ⏭️  Skipped (already exists): {len(article_failures['skipped_existing'])}")
+            
+        if article_failures.get('failed_downloads'):
+            logger.info(f"  ❌ Failed to download: {len(article_failures['failed_downloads'])}")
+            for failure in article_failures['failed_downloads']:
+                logger.info(f"     - {failure}")
+    
+    # Indexing summary
+    indexing_failures = all_failures.get('indexing', {})
+    if indexing_failures:
+        logger.info("\n🔍 INDEXING & EMBEDDING:")
+        
+        # Successes
+        text_files = indexing_failures.get('successful_text_files', 0)
+        pdf_files = indexing_failures.get('successful_pdf_files', 0)
+        notebooks = indexing_failures.get('successful_notebook_conversions', 0)
+        
+        if text_files > 0:
+            logger.info(f"  ✅ Successfully indexed text files: {text_files}")
+        if pdf_files > 0:
+            logger.info(f"  ✅ Successfully indexed PDF files: {pdf_files}")
+        if notebooks > 0:
+            logger.info(f"  ✅ Successfully converted notebooks: {notebooks}")
+        
+        # Skipped
+        if indexing_failures.get('skipped_repositories'):
+            logger.info(f"  ⏭️  Skipped repositories (not found): {len(indexing_failures['skipped_repositories'])}")
+            for repo in indexing_failures['skipped_repositories']:
+                logger.info(f"     - {repo}")
+                
+        if indexing_failures.get('skipped_articles'):
+            logger.info(f"  ⏭️  Skipped articles (not found): {len(indexing_failures['skipped_articles'])}")
+            for article in indexing_failures['skipped_articles']:
+                logger.info(f"     - {article}")
+        
+        # Failures
+        if indexing_failures.get('failed_text_files'):
+            logger.info(f"  ❌ Failed to process text files: {len(indexing_failures['failed_text_files'])}")
+            for failure in indexing_failures['failed_text_files']:
+                logger.info(f"     - {failure}")
+                
+        if indexing_failures.get('failed_pdf_files'):
+            logger.info(f"  ❌ Failed to process PDF files: {len(indexing_failures['failed_pdf_files'])}")
+            for failure in indexing_failures['failed_pdf_files']:
+                logger.info(f"     - {failure}")
+                
+        if indexing_failures.get('failed_notebook_conversions'):
+            logger.info(f"  ❌ Failed notebook conversions: {len(indexing_failures['failed_notebook_conversions'])}")
+            for failure in indexing_failures['failed_notebook_conversions']:
+                logger.info(f"     - {failure}")
+    
+    # Overall status
+    total_failures = (
+        len(repo_failures.get('failed_clones', [])) +
+        len(repo_failures.get('failed_updates', [])) +
+        len(article_failures.get('failed_downloads', [])) +
+        len(indexing_failures.get('failed_text_files', [])) +
+        len(indexing_failures.get('failed_pdf_files', [])) +
+        len(indexing_failures.get('failed_notebook_conversions', []))
+    )
+    
+    logger.info("\n" + "=" * 60)
+    if total_failures == 0:
+        logger.info(f"{prefix}✅ PIPELINE COMPLETED SUCCESSFULLY - No failures detected!")
+    else:
+        logger.info(f"{prefix}⚠️  PIPELINE COMPLETED WITH {total_failures} FAILURES")
+        logger.info("Check the detailed failure list above for specific issues.")
+    logger.info("=" * 60)
 
 
 def cleanup_pdf_articles(articles_config_path: str, base_path: str = "knowledge_base/raw", category: str = None) -> None:
