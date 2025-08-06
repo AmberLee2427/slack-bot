@@ -19,6 +19,9 @@ try:
 except ImportError:
     convert_ipynb_to_txt = None
 
+# Fix OpenMP issue before importing any ML libraries
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 # Add import for direct Tika PDF processing
 try:
     import tika
@@ -28,6 +31,96 @@ except ImportError:
     TIKA_AVAILABLE = False
 
 import shutil
+
+def extract_text_fallback(pdf_path):
+    """
+    Extract text from PDF using fallback methods when Tika fails
+    
+    Args:
+        pdf_path: Path to PDF file
+        
+    Returns:
+        str: Extracted text or None if all methods fail
+    """
+    
+    # Try PyPDF2 first
+    try:
+        import PyPDF2
+        with open(pdf_path, 'rb') as file:
+            reader = PyPDF2.PdfReader(file)
+            text = ""
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+            if len(text.strip()) > 100:  # Minimum viable text
+                return text.strip()
+    except Exception:
+        pass
+    
+    # Try pdfplumber
+    try:
+        import pdfplumber
+        text = ""
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+        if len(text.strip()) > 100:
+            return text.strip()
+    except Exception:
+        pass
+    
+    # Try PyMuPDF (fitz)
+    try:
+        import fitz
+        doc = fitz.open(str(pdf_path))
+        text = ""
+        for page in doc:
+            text += page.get_text() + "\n"
+        doc.close()
+        if len(text.strip()) > 100:
+            return text.strip()
+    except Exception:
+        pass
+    
+    return None
+
+def process_pdf_with_fallback(pdf_path, repo_info=None, article_info=None):
+    """
+    Process PDF with Tika first, then fallback methods
+    
+    Args:
+        pdf_path: Path to PDF file
+        repo_info: Repository info dict (for repo PDFs)
+        article_info: Article info dict (for article PDFs)
+        
+    Returns:
+        tuple: (content, success)
+    """
+    logger = logging.getLogger(__name__)
+    
+    # Try Tika first if available
+    if 'tika_ready' in globals() and tika_ready:
+        try:
+            parsed = tika_parser.from_file(str(pdf_path))
+            content = parsed.get('content', '') if parsed else ''
+            
+            if content and len(content.strip()) > 100:
+                return content.strip(), True
+        except Exception as e:
+            logger.warning(f"Tika processing failed for {pdf_path}: {e}")
+    
+    # Fall back to alternative methods
+    logger.info(f"Using fallback PDF extraction for {pdf_path}")
+    content = extract_text_fallback(pdf_path)
+    
+    if content:
+        return content, True
+    else:
+        logger.warning(f"All PDF extraction methods failed for {pdf_path}")
+        return None, False
 
 def get_file_type_category(doc_id: str) -> str:
     """
@@ -202,7 +295,16 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
         from txtai.embeddings import Embeddings
     except ImportError:
         logger.error("txtai not available. Please install with: pip install txtai")
-        return
+        return {
+            'failed_text_files': [],
+            'failed_pdf_files': [],
+            'failed_notebook_conversions': [],
+            'successful_text_files': 0,
+            'successful_pdf_files': 0,
+            'successful_notebook_conversions': 0,
+            'skipped_repositories': [],
+            'skipped_articles': []
+        }
 
     # Check if dual embedding is enabled
     use_dual_embedding = os.environ.get("USE_DUAL_EMBEDDING", "true").lower() == "true"
@@ -212,15 +314,39 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
     if use_dual_embedding:
         logger.info(f"Code model: {code_model}")
 
-    # Initialize Tika for PDF processing
+    # Initialize Tika for PDF processing with better error handling
     tika_ready = False
-    if TIKA_AVAILABLE:
+    pdf_fallback_available = False
+    
+    # Check for fallback PDF libraries
+    try:
+        import PyPDF2
+        pdf_fallback_available = True
+        logger.info("✅ PyPDF2 available as fallback")
+    except ImportError:
         try:
+            import pdfplumber
+            pdf_fallback_available = True
+            logger.info("✅ pdfplumber available as fallback")
+        except ImportError:
+            pass
+    
+    if TIKA_AVAILABLE and not os.environ.get("SKIP_PDF_PROCESSING", "").lower() == "true":
+        try:
+            # Set better timeout settings
+            os.environ.setdefault("TIKA_CLIENT_TIMEOUT", "60")
+            os.environ.setdefault("TIKA_SERVER_TIMEOUT", "60")
+            os.environ.setdefault("TIKA_STARTUP_TIMEOUT", "120")
+            
             tika.initVM()
             tika_ready = True
             logger.info("✅ Tika VM initialized for PDF processing")
         except Exception as e:
             logger.warning(f"Failed to initialize Tika VM: {e}")
+            if pdf_fallback_available:
+                logger.info("Will use fallback PDF processing methods")
+            else:
+                logger.warning("No PDF processing will be available")
 
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
@@ -357,17 +483,16 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
             # Process PDF files found in repository
             for pdf_path in pdf_files:
                 try:
-                    # Extract text from PDF using direct Tika parser
-                    parsed = tika_parser.from_file(str(pdf_path))
-                    content = parsed.get('content', '') if parsed else ''
+                    # Use new fallback processing
+                    content, success = process_pdf_with_fallback(pdf_path, repo_info=repo)
                     
-                    if content and len(content.strip()) > 100:
+                    if success and content:
                         # Create document ID
                         doc_id = f"{cat}/{repo_name}/{pdf_path.relative_to(repo_dir)}"
                         
                         # Add metadata to content
                         metadata = f"Source: Repository PDF from {repo['url']}\nPath: {pdf_path.relative_to(repo_dir)}\nType: Repository Document\n\n"
-                        full_content = metadata + content.strip()
+                        full_content = metadata + content
                         
                         # Add to documents list
                         documents.append((doc_id, full_content))
@@ -402,19 +527,18 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
                 logger.info(f"[DRY RUN] Would process PDF {pdf_file}")
                 continue
 
-            if tika_ready:
+            if tika_ready or pdf_fallback_available:
                 try:
-                    # Extract text from PDF using direct Tika parser
-                    parsed = tika_parser.from_file(str(pdf_file))
-                    content = parsed.get('content', '') if parsed else ''
+                    # Use new fallback processing
+                    content, success = process_pdf_with_fallback(pdf_file, article_info=article)
                     
-                    if content and len(content.strip()) > 100:
+                    if success and content:
                         # Create document ID
                         doc_id = f"journal_articles/{cat}/{article_name}"
                         
                         # Add metadata to content
                         metadata = f"Title: {article['description']}\nSource: {article.get('url', 'Unknown')}\nType: Journal Article\n\n"
-                        full_content = metadata + content.strip()
+                        full_content = metadata + content
                         
                         # Add to documents list
                         documents.append((doc_id, full_content))
@@ -428,8 +552,8 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
                     logger.error(f"Error processing PDF {pdf_file}: {e}")
                     failures['failed_pdf_files'].append(f"{pdf_file}: {str(e)}")
             else:
-                logger.warning(f"Tika not available. Skipping PDF {pdf_file}")
-                failures['failed_pdf_files'].append(f"{pdf_file}: Tika not available")
+                logger.warning(f"No PDF processing available. Skipping PDF {pdf_file}")
+                failures['failed_pdf_files'].append(f"{pdf_file}: No PDF processing available")
     
     if documents:
         logger.info(f"Indexing {len(documents)} documents...")
@@ -559,7 +683,7 @@ def print_pipeline_summary(all_failures: dict, dry_run: bool = False) -> None:
                 logger.info(f"     - {failure}")
     
     # Indexing summary
-    indexing_failures = all_failures.get('indexing', {})
+    indexing_failures = all_failures.get('indexing', {}) or {}
     if indexing_failures:
         logger.info("\n🔍 INDEXING & EMBEDDING:")
         

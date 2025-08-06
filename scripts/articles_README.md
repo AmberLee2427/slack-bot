@@ -23,11 +23,17 @@ The main knowledge base build pipeline now supports downloading PDFs from URLs a
 
 2. **Build the complete knowledge base** (repos + PDFs):
    ```bash
+   # RECOMMENDED: Use the new build script with proper Java environment
+   ./build_with_java.sh
+   
+   # OR manually set up environment and run:
+   export JAVA_HOME="/opt/homebrew/opt/openjdk"
+   export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"
    export KMP_DUPLICATE_LIB_OK=TRUE
    conda activate roman-slack-bot
    
    # Build everything (downloads repos and PDFs, creates embeddings, cleans up)
-   python scripts/build_knowledge_base.py
+   python scripts/build_knowledge_base.py --config config/repositories.yml --articles-config config/articles.yml
    
    # Build only PDF articles
    python scripts/build_knowledge_base.py --category journal_articles
@@ -43,6 +49,9 @@ The main knowledge base build pipeline now supports downloading PDFs from URLs a
 - ✅ **Integrated embeddings** - PDFs included in the same search index as code
 - ✅ **Metadata preservation** - title, description, and URL included in search results
 - ✅ **Categorized organization** - separate categories like `journal_articles`, `reviews`, etc.
+- ✅ **Robust PDF processing** - Multiple fallback methods when Tika fails
+- ✅ **Java environment auto-setup** - Automated via `build_with_java.sh`
+- ✅ **Troubleshooting tools** - Diagnostic notebook for debugging issues
 
 ## 📄 **Standalone PDF Manager**
 
@@ -107,35 +116,62 @@ pip install "txtai[pipeline]"
 # macOS users: handle OpenMP conflicts
 export KMP_DUPLICATE_LIB_OK=TRUE
 
-# Java required for PDF processing
+# CRITICAL: Java required for PDF processing
+# Install Java if not already installed:
+brew install openjdk  # macOS
+# sudo apt-get install openjdk-11-jdk  # Ubuntu/Debian
+
+# Set up Java environment (REQUIRED for Tika PDF processing)
+export JAVA_HOME="/opt/homebrew/opt/openjdk"
+export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"
+
+# Verify Java is working:
 java -version
 ```
 
-## ⚠️ **Current Known Issues**
+## ⚠️ **Known Issues & Solutions**
 
-1. **Tika Server Issues**: Occasional startup problems with Apache Tika server for PDF processing
-   - Workaround: Restart session or run with `--dirty` to inspect individual steps
+1. **~~Tika Server Issues~~**: ✅ **FIXED** - Previous startup problems with Apache Tika server for PDF processing have been resolved
+   - **Solution**: Use `./build_with_java.sh` which properly sets up Java environment
+   - **Root Cause**: Java PATH configuration issues have been addressed
 
 2. **PDF URL Reliability**: Some publisher PDFs require authentication or have changing URLs
    - Use stable URLs like arXiv: `https://arxiv.org/pdf/1234.5678.pdf`
+   - ADS gateway URLs may have redirect limits or access restrictions
+
+3. **Java Environment**: If you encounter "Unable to locate a Java Runtime" errors
+   - Install Java: `brew install openjdk` (macOS) 
+   - Set environment: `export JAVA_HOME="/opt/homebrew/opt/openjdk"`
+   - Use the provided `build_with_java.sh` script for automatic setup
 
 ## 🎯 **Usage Patterns**
 
 ### For Development/Testing:
 ```bash
-# Test the pipeline
+# RECOMMENDED: Use the new build script with Java environment setup
+./build_with_java.sh
+
+# Test the pipeline with dry run
 python scripts/build_knowledge_base.py --dry-run
 
-# Download specific category only
+# Download specific category only  
 python scripts/build_knowledge_base.py --category roman_mission
 
 # Keep files for debugging
 python scripts/build_knowledge_base.py --dirty
+
+# If you need to troubleshoot, use the diagnostic notebook:
+jupyter notebook knowledge_base_troubleshooting.ipynb
 ```
 
 ### For Production:
 ```bash
-# Full rebuild (everything)
+# RECOMMENDED: Full rebuild with Java environment setup
+./build_with_java.sh
+
+# Full rebuild (everything) - manual approach
+export JAVA_HOME="/opt/homebrew/opt/openjdk"
+export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"
 python scripts/build_knowledge_base.py --force-update
 
 # Regular update (only new content)
@@ -149,4 +185,7 @@ python scripts/manage_pdf_articles.py --list
 
 # Add individual PDF
 python scripts/manage_articles.py add /path/to/new_paper.pdf
+
+# Troubleshoot any issues
+jupyter notebook knowledge_base_troubleshooting.ipynb
 ```

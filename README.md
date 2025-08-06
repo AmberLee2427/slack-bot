@@ -79,13 +79,13 @@ GitHub Pages sites           Direct text (code/docs)          Semantic search
 - Python 3.12 or higher
 - Git
 - Slack workspace with admin permissions
-- **Java 8+ (for PDF processing)** - required for processing journal articles
+- **Java 8+ (REQUIRED for PDF processing)** - needed for Apache Tika to process journal articles
 
 ### Quick Start
 
-1. **Install Java (for PDF processing)**
+1. **Install Java (REQUIRED for PDF processing)**
    ```bash
-   # macOS (using Homebrew)
+   # macOS (using Homebrew) - RECOMMENDED
    brew install openjdk
    
    # Ubuntu/Debian
@@ -93,6 +93,9 @@ GitHub Pages sites           Direct text (code/docs)          Semantic search
    
    # Windows (using Chocolatey)
    choco install openjdk
+   
+   # Verify installation
+   java -version
    ```
 
 2. **Clone the repository**
@@ -178,6 +181,14 @@ GitHub Pages sites           Direct text (code/docs)          Semantic search
 
 5. **Build the knowledge base**
    ```bash
+   # RECOMMENDED: Use the automated build script with proper Java setup
+   ./build_with_java.sh
+   
+   # OR manually set up environment (if build_with_java.sh doesn't exist):
+   export JAVA_HOME="/opt/homebrew/opt/openjdk"  # macOS with Homebrew
+   export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"
+   export KMP_DUPLICATE_LIB_OK=TRUE
+
    # Process repositories only (no PDF processing)
    python scripts/build_knowledge_base.py --config config/repositories.yml
    
@@ -201,6 +212,16 @@ GitHub Pages sites           Direct text (code/docs)          Semantic search
 
 ### 🚨 Troubleshooting Setup
 
+**"Unable to locate a Java Runtime" or Tika server errors**
+- Ensure Java is installed: `brew install openjdk` (macOS)
+- Set Java environment variables:
+  ```bash
+  export JAVA_HOME="/opt/homebrew/opt/openjdk"
+  export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"
+  ```
+- Use the provided `build_with_java.sh` script for automatic setup
+- Check the troubleshooting notebook: `knowledge_base_troubleshooting.ipynb`
+
 **"Sending messages to this app has been turned off"**
 - Go to your Slack app settings → **App Home**
 - Enable **Messages Tab** and **Allow users to send messages**
@@ -211,10 +232,10 @@ GitHub Pages sites           Direct text (code/docs)          Semantic search
 - Verify your ngrok URL is correct in the manifest
 - Restart Slack client after app changes
 
-**Java/PDF processing errors**
+**PDF processing errors (optional feature)**
 - Install Java: `brew install openjdk` (macOS) or equivalent
 - Verify with: `java -version`
-- PDF processing is optional - Nancy works without it
+- PDF processing is optional - Nancy works without it, but with reduced knowledge base
 
 ## 📖 Usage
 
