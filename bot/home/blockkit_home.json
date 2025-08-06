@@ -1,0 +1,66 @@
+{
+  "type": "home",
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": "Nancy: Roman Microlensing Data Assistant"
+      }
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "ℹ️ Just start chatting with me. I have access to all challenge documentation, curated articles, and code repositories. I cannot search the web."
+        }
+      ]
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Explore My Knowledge Base*"
+      }
+    },
+    {
+			"type": "actions",
+			"elements": [
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Challenge Docs",
+						"emoji": true
+					},
+					"value": "view_docs",
+          "action_id": "btn_view_docs"
+				},
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Research Articles",
+						"emoji": true
+					},
+					"value": "view_articles",
+          "action_id": "btn_view_articles"
+				},
+        {
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Code Repositories",
+						"emoji": true
+					},
+					"value": "view_repos",
+          "action_id": "btn_view_repos"
+				}
+			]
+		}
+  ]
+}

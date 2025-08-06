@@ -36,11 +36,11 @@ logger = logging.getLogger(__name__)
 class NancyBot:
     def __init__(self):
         # Get tokens from environment with fallbacks for development
-        bot_token = os.environ.get("SLACK_BOT_TOKEN", "")
+        self.bot_token = os.environ.get("SLACK_BOT_TOKEN", "")
         signing_secret = os.environ.get("SLACK_SIGNING_SECRET", "")
         
-        if bot_token:
-            self.slack_client = AsyncWebClient(token=bot_token)
+        if self.bot_token:
+            self.slack_client = AsyncWebClient(token=self.bot_token)
         else:
             logger.warning("No SLACK_BOT_TOKEN found - some features will be limited")
             self.slack_client = None
@@ -57,7 +57,7 @@ class NancyBot:
             config_path="config/repositories.yml"
         )
         # Pass the existing RAG service to LLM service to avoid conflicts
-        self.llm_service = LLMService(rag_service=self.rag_service)
+        self.llm_service = LLMService(rag_service=self.rag_service, debugging=True)  # Force debugging on
         
         # Track processed events to prevent duplicates
         self.processed_events = set()
@@ -190,26 +190,63 @@ class NancyBot:
                 # First, get conversation history for context
                 thread_ts = event.get("thread_ts")  # If this is in a thread
                 conversation_history = await self.get_conversation_history(
-                    channel=channel, 
+                    channel_id=channel, 
                     thread_ts=thread_ts, 
                     limit=10
                 )
                 
                 logger.info(f"Fetched {len(conversation_history)} messages for context")
                 if conversation_history:
+                    logger.info(f"Conversation history details:")
+                    for i, msg in enumerate(conversation_history):
+                        logger.info(f"  [{i}] User: {msg.get('user', 'Unknown')}, Text: {msg.get('text', '')[:50]}..., Is_bot: {msg.get('is_bot', False)}")
                     logger.info(f"Sample conversation context: {conversation_history[-1] if conversation_history else 'None'}")
+                else:
+                    logger.info("No conversation history retrieved")
                 
                 await self.generate_response_with_updates(
                     clean_text, 
                     send_message, 
                     event.get("ts"),
-                    conversation_history
+                    conversation_history,
+                    thread_ts  # Pass thread_ts for context caching
                 )
         except Exception as e:
             logger.error(f"Error in process_message: {e}")
             return
     
-    async def get_conversation_history(self, channel: str, thread_ts: str = None, limit: int = 10) -> list:
+    def _is_context_block_message(self, text):
+        """
+        Check if a message is a context block (status update) that should be filtered out.
+        These are typically messages like ':mag: _Searching for relevant information_'
+        """
+        if not text:
+            return False
+            
+        # Check for common patterns in context block messages
+        text_lower = text.lower().strip()
+        
+        # Pattern 1: Emoji followed by italic text (underscores)
+        if text.startswith(':') and '_' in text:
+            return True
+            
+        # Pattern 2: Common status messages
+        status_indicators = [
+            '_searching for',
+            '_retrieving',
+            '_analyzing',
+            '_looking through',
+            '_checking',
+            '_found',
+        ]
+        
+        for indicator in status_indicators:
+            if indicator in text_lower:
+                return True
+                
+        return False
+
+    async def get_conversation_history(self, channel_id, thread_ts=None, limit=10):
         """
         Fetch recent conversation history from Slack.
         Returns a list of messages with user info and timestamps.
@@ -222,9 +259,9 @@ class NancyBot:
             headers = {"Authorization": f"Bearer {self.bot_token}"}
             
             params = {
-                "channel": channel,
+                "channel": channel_id,
                 "limit": limit,
-                "inclusive": True
+                "inclusive": "true"  # Slack API expects string, not boolean
             }
             
             # If we're in a thread, get thread replies instead
@@ -242,19 +279,37 @@ class NancyBot:
                             # Sort by timestamp (oldest first) and format for context
                             formatted_messages = []
                             for msg in sorted(messages, key=lambda x: float(x.get("ts", 0))):
-                                # Skip bot messages and system messages
-                                if msg.get("bot_id") or msg.get("subtype"):
+                                # Skip system messages but keep bot messages (Nancy's responses)
+                                if msg.get("subtype") and msg.get("subtype") != "bot_message":
                                     continue
                                     
                                 user_id = msg.get("user", "Unknown")
                                 text = msg.get("text", "")
                                 ts = msg.get("ts", "")
                                 
-                                formatted_messages.append({
-                                    "user": user_id,
-                                    "text": text,
-                                    "timestamp": ts
-                                })
+                                # Handle bot messages (Nancy's responses)
+                                if msg.get("bot_id"):
+                                    # Filter out context block messages (status updates)
+                                    # These are messages that start with emoji and have underscores (italics)
+                                    if self._is_context_block_message(text):
+                                        continue
+                                        
+                                    bot_profile = msg.get("bot_profile", {})
+                                    bot_name = bot_profile.get("name", "Nancy")
+                                    formatted_messages.append({
+                                        "user": f"Bot_{bot_name}",
+                                        "text": text,
+                                        "timestamp": ts,
+                                        "is_bot": True
+                                    })
+                                else:
+                                    # Regular user message
+                                    formatted_messages.append({
+                                        "user": user_id,
+                                        "text": text,
+                                        "timestamp": ts,
+                                        "is_bot": False
+                                    })
                             
                             logger.info(f"Retrieved {len(formatted_messages)} conversation messages")
                             return formatted_messages[-limit:]  # Return most recent N messages
@@ -268,7 +323,7 @@ class NancyBot:
             
         return []  # Return empty list on error
     
-    async def generate_response_with_updates(self, query: str, send_callback, original_ts: str, conversation_history: list = None):
+    async def generate_response_with_updates(self, query: str, send_callback, original_ts: str, conversation_history: list = None, thread_ts: str = None):
         """Generate AI response with intermediate updates and conversation context"""
         try:
             # Create a queue to collect messages from the LLM thread
@@ -295,7 +350,8 @@ class NancyBot:
                 self.llm_service.call_llm_with_callback, 
                 query, 
                 sync_callback,
-                conversation_history
+                conversation_history,
+                thread_ts  # Pass thread_ts for context caching
             )
             
             # Process messages from the queue as they arrive

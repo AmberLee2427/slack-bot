@@ -10,12 +10,68 @@ from pathlib import Path
 import logging
 import argparse
 import json
+import requests
+import tempfile
 
 # Add import for nb4llm
 try:
     from nb4llm import convert_ipynb_to_txt
 except ImportError:
     convert_ipynb_to_txt = None
+
+# Add import for txtai Textractor
+try:
+    from txtai.pipeline import Textractor
+except ImportError:
+    Textractor = None
+
+def download_pdf_articles(config_path: str, base_path: str = "knowledge_base/raw", dry_run: bool = False, category: str = None, force_update: bool = False) -> None:
+    """Download PDF articles from URLs"""
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger(__name__)
+
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+
+    categories = [category] if category else list(config.keys())
+    for cat in categories:
+        articles = config.get(cat)
+        if not isinstance(articles, list):
+            continue
+        for article in articles:
+            article_name = article["name"]
+            article_url = article["url"]
+            dest_dir = Path(base_path) / cat
+            dest_file = dest_dir / f"{article_name}.pdf"
+            
+            if dest_file.exists():
+                if force_update:
+                    logger.info(f"Article {cat}/{article_name}.pdf exists. Re-downloading...")
+                    if dry_run:
+                        logger.info(f"[DRY RUN] Would re-download {article_url} to {dest_file}")
+                        continue
+                else:
+                    logger.info(f"Article {cat}/{article_name}.pdf already exists, skipping.")
+                    continue
+            
+            logger.info(f"Downloading {article_name} from {article_url} to {dest_file}...")
+            if dry_run:
+                logger.info(f"[DRY RUN] Would download {article_url} to {dest_file}")
+                continue
+                
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                response = requests.get(article_url, stream=True, timeout=30)
+                response.raise_for_status()
+                
+                with open(dest_file, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                        
+                logger.info(f"Successfully downloaded {article_name}")
+            except Exception as e:
+                logger.error(f"Failed to download {article_name}: {e}")
+
 
 def clone_repositories(config_path: str, base_path: str = "knowledge_base/raw", dry_run: bool = False, category: str = None, force_update: bool = False) -> None:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -67,8 +123,8 @@ def clone_repositories(config_path: str, base_path: str = "knowledge_base/raw", 
                     logger.error(f"Failed to clone {repo_name}: {e.stderr}")
 
 
-def build_txtai_index(config_path: str, base_path: str = "knowledge_base/raw", embeddings_path: str = "knowledge_base/embeddings", dry_run: bool = False, category: str = None) -> None:
-    """Build txtai embeddings index directly from raw files"""
+def build_txtai_index(config_path: str, articles_config_path: str = None, base_path: str = "knowledge_base/raw", embeddings_path: str = "knowledge_base/embeddings", dry_run: bool = False, category: str = None) -> None:
+    """Build txtai embeddings index directly from raw files and PDFs"""
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
 
@@ -78,8 +134,29 @@ def build_txtai_index(config_path: str, base_path: str = "knowledge_base/raw", e
         logger.error("txtai not available. Please install with: pip install txtai")
         return
 
+    # Initialize Textractor for PDF processing
+    textractor = None
+    if Textractor is not None:
+        try:
+            textractor = Textractor(
+                paragraphs=True,
+                minlength=50,
+                join=True,
+                sections=True
+            )
+            logger.info("✅ Textractor initialized for PDF processing")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Textractor: {e}")
+
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
+
+    # Load articles config if provided
+    articles_config = {}
+    if articles_config_path and os.path.exists(articles_config_path):
+        with open(articles_config_path, "r") as f:
+            articles_config = yaml.safe_load(f)
+        logger.info(f"Loaded articles configuration from {articles_config_path}")
 
     # Create embeddings directory
     embeddings_dir = Path(embeddings_path)
@@ -102,6 +179,7 @@ def build_txtai_index(config_path: str, base_path: str = "knowledge_base/raw", e
     categories = [category] if category else list(config.keys())
     documents = []
     
+    # Process repository files
     for cat in categories:
         repos = config.get(cat)
         if not isinstance(repos, list):
@@ -166,6 +244,50 @@ def build_txtai_index(config_path: str, base_path: str = "knowledge_base/raw", e
                 except Exception as e:
                     logger.warning(f"Error reading {file_path}: {e}")
     
+    # Process PDF articles
+    article_categories = [category] if category else list(articles_config.keys())
+    for cat in article_categories:
+        articles = articles_config.get(cat)
+        if not isinstance(articles, list):
+            continue
+        for article in articles:
+            article_name = article["name"]
+            pdf_file = Path(base_path) / cat / f"{article_name}.pdf"
+            
+            if not pdf_file.exists():
+                logger.warning(f"PDF file {pdf_file} does not exist. Skipping {cat}/{article_name}.")
+                continue
+                
+            logger.info(f"Processing PDF {cat}/{article_name}...")
+            
+            if dry_run:
+                logger.info(f"[DRY RUN] Would process PDF {pdf_file}")
+                continue
+
+            if textractor is not None:
+                try:
+                    # Extract text from PDF using Textractor
+                    content = textractor(str(pdf_file))
+                    
+                    if content and len(content.strip()) > 100:
+                        # Create document ID
+                        doc_id = f"journal_articles/{cat}/{article_name}"
+                        
+                        # Add metadata to content
+                        metadata = f"Title: {article['description']}\nSource: {article.get('url', 'Unknown')}\nType: Journal Article\n\n"
+                        full_content = metadata + content
+                        
+                        # Add to documents list
+                        documents.append((doc_id, full_content))
+                        logger.info(f"Added PDF {doc_id} ({len(content)} chars)")
+                    else:
+                        logger.warning(f"Failed to extract meaningful text from {pdf_file}")
+                        
+                except Exception as e:
+                    logger.error(f"Error processing PDF {pdf_file}: {e}")
+            else:
+                logger.warning(f"Textractor not available. Skipping PDF {pdf_file}")
+    
     if documents:
         logger.info(f"Indexing {len(documents)} documents...")
         if not dry_run:
@@ -184,18 +306,65 @@ def build_txtai_index(config_path: str, base_path: str = "knowledge_base/raw", e
         logger.warning("No documents found to index")
 
 
-def build_pipeline(config_path: str, base_path: str = "knowledge_base/raw", embeddings_path: str = "knowledge_base/embeddings", dry_run: bool = False, category: str = None, force_update: bool = False, dirty: bool = False) -> None:
+def build_pipeline(config_path: str, articles_config_path: str = None, base_path: str = "knowledge_base/raw", embeddings_path: str = "knowledge_base/embeddings", dry_run: bool = False, category: str = None, force_update: bool = False, dirty: bool = False) -> None:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
     
+    # Clone repositories
     clone_repositories(config_path, base_path, dry_run, category, force_update)
-    build_txtai_index(config_path, base_path, embeddings_path, dry_run, category)
     
+    # Download PDF articles if config provided
+    if articles_config_path and os.path.exists(articles_config_path):
+        download_pdf_articles(articles_config_path, base_path, dry_run, category, force_update)
+    elif articles_config_path:
+        logger.warning(f"Articles config file {articles_config_path} not found. Skipping PDF downloads.")
+    
+    # Build embeddings index including both repos and PDFs
+    build_txtai_index(config_path, articles_config_path, base_path, embeddings_path, dry_run, category)
+    
+    # Cleanup downloaded files
     if not dirty and not dry_run:
-        logger.info("Cleaning up raw repositories...")
+        logger.info("Cleaning up raw repositories and PDFs...")
         cleanup_raw_repositories(config_path, base_path, category)
+        if articles_config_path and os.path.exists(articles_config_path):
+            cleanup_pdf_articles(articles_config_path, base_path, category)
     elif dry_run and not dirty:
-        logger.info("[DRY RUN] Would clean up raw repositories after processing")
+        logger.info("[DRY RUN] Would clean up raw repositories and PDFs after processing")
+
+
+def cleanup_pdf_articles(articles_config_path: str, base_path: str = "knowledge_base/raw", category: str = None) -> None:
+    """Clean up downloaded PDF articles after embeddings are built"""
+    logger = logging.getLogger(__name__)
+    
+    with open(articles_config_path, "r") as f:
+        config = yaml.safe_load(f)
+    
+    categories = [category] if category else list(config.keys())
+    for cat in categories:
+        articles = config.get(cat)
+        if not isinstance(articles, list):
+            continue
+        for article in articles:
+            article_name = article["name"]
+            pdf_file = Path(base_path) / cat / f"{article_name}.pdf"
+            
+            if pdf_file.exists():
+                try:
+                    pdf_file.unlink()
+                    logger.info(f"Cleaned up PDF {cat}/{article_name}.pdf")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up PDF {cat}/{article_name}.pdf: {e}")
+    
+    # Clean up empty category directories
+    base_path_obj = Path(base_path)
+    if base_path_obj.exists():
+        for cat_dir in base_path_obj.iterdir():
+            if cat_dir.is_dir() and not any(cat_dir.iterdir()):
+                try:
+                    cat_dir.rmdir()
+                    logger.info(f"Cleaned up empty category directory: {cat_dir}")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up empty category directory {cat_dir}: {e}")
 
 
 def cleanup_raw_repositories(config_path: str, base_path: str = "knowledge_base/raw", category: str = None) -> None:
@@ -234,19 +403,21 @@ def cleanup_raw_repositories(config_path: str, base_path: str = "knowledge_base/
                     logger.warning(f"Failed to clean up empty category directory {cat_dir}: {e}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Build the knowledge base by cloning repositories and creating txtai embeddings.")
+    parser = argparse.ArgumentParser(description="Build the knowledge base by cloning repositories, downloading PDFs, and creating txtai embeddings.")
     parser.add_argument("--config", default="config/repositories.yml", help="Path to repository configuration file")
-    parser.add_argument("--base-path", default="knowledge_base/raw", help="Base path for repositories")
+    parser.add_argument("--articles-config", default="config/articles.yml", help="Path to PDF articles configuration file")
+    parser.add_argument("--base-path", default="knowledge_base/raw", help="Base path for repositories and PDFs")
     parser.add_argument("--embeddings-path", default="knowledge_base/embeddings", help="Path for embeddings index")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be done without making changes")
     parser.add_argument("--category", help="Process only a specific category")
-    parser.add_argument("--force-update", action="store_true", help="Update repositories if they already exist (git pull)")
-    parser.add_argument("--dirty", action="store_true", help="Leave the raw repo in place after embeddings are built")
+    parser.add_argument("--force-update", action="store_true", help="Update repositories and re-download PDFs if they already exist")
+    parser.add_argument("--dirty", action="store_true", help="Leave the raw repos and PDFs in place after embeddings are built")
 
     args = parser.parse_args()
 
     build_pipeline(
         config_path=args.config,
+        articles_config_path=args.articles_config,
         base_path=args.base_path,
         embeddings_path=args.embeddings_path,
         dry_run=args.dry_run,

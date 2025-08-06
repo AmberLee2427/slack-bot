@@ -72,6 +72,11 @@ class LLMService:
         # Build a list of all indexed file paths from the embeddings database (once)
         self.update_rag_variables()
 
+        # Thread context caching - tracks what files Nancy has looked at per thread
+        # Format: {thread_ts: (timestamp, [doc_id1, doc_id2, doc_id3])}
+        self.thread_cache_path = nancy_base / "bot/config/thread_cache.json"
+        self.thread_retrievals = self._load_thread_cache()
+
         # import tools
         from bot.plugins.llm.tools import (
             retrieve_tool, 
@@ -85,6 +90,63 @@ class LLMService:
         self.response_tool = response_tool
         self.search_tool = search_tool
         self.tree_tool = tree_tool
+    
+    def _load_thread_cache(self):
+        """Load thread cache from disk"""
+        try:
+            if self.thread_cache_path.exists():
+                with open(self.thread_cache_path, 'r') as f:
+                    data = json.load(f)
+                    # Convert string keys back to proper format
+                    thread_cache = {}
+                    for thread_ts, (timestamp, files) in data.items():
+                        thread_cache[thread_ts] = (timestamp, files)
+                    
+                    if self.debugging:
+                        logger = __import__('logging').getLogger(__name__)
+                        logger.info(f"Loaded thread cache with {len(thread_cache)} threads")
+                    return thread_cache
+        except Exception as e:
+            logger = __import__('logging').getLogger(__name__)
+            logger.warning(f"Failed to load thread cache: {e}")
+        
+        return {}
+    
+    def _save_thread_cache(self):
+        """Save thread cache to disk"""
+        try:
+            # Ensure directory exists
+            self.thread_cache_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(self.thread_cache_path, 'w') as f:
+                json.dump(self.thread_retrievals, f, indent=2)
+                
+            if self.debugging:
+                logger = __import__('logging').getLogger(__name__)
+                logger.info(f"Saved thread cache with {len(self.thread_retrievals)} threads")
+        except Exception as e:
+            logger = __import__('logging').getLogger(__name__)
+            logger.error(f"Failed to save thread cache: {e}")
+
+    def _prune_thread_cache(self, max_threads: int = 50):
+        """Prune thread cache to keep only the most recent threads"""
+        if len(self.thread_retrievals) > max_threads:
+            # Sort by timestamp (newest first) and keep only the most recent
+            sorted_threads = sorted(
+                self.thread_retrievals.items(), 
+                key=lambda x: x[1][0], 
+                reverse=True
+            )
+            
+            # Keep only the top max_threads
+            self.thread_retrievals = dict(sorted_threads[:max_threads])
+            
+            if self.debugging:
+                logger = __import__('logging').getLogger(__name__)
+                logger.info(f"Pruned thread cache to {len(self.thread_retrievals)} threads")
+            
+            # Save after pruning
+            self._save_thread_cache()
 
     def update_rag_variables(self):
         all_indexed_docs = list(self.rag.embeddings.database.search("select id, text from txtai"))
@@ -98,8 +160,31 @@ class LLMService:
         else:
             self.model_weights = {}
 
-    def get_initial_context(self, query: str) -> str:
-        #get the initial context
+    def get_initial_context(self, query: str, thread_ts: str = None) -> str:
+        """Get initial context - either from thread cache or RAG search"""
+        import time
+        
+        # If we're in a thread and have cached context, use that instead of RAG
+        if thread_ts and thread_ts in self.thread_retrievals:
+            timestamp, cached_doc_ids = self.thread_retrievals[thread_ts]
+            if cached_doc_ids:
+                logger = __import__('logging').getLogger(__name__)
+                logger.info(f"Using cached thread context: {len(cached_doc_ids)} files from thread {thread_ts}")
+                
+                # Get content from cached files
+                context_parts = []
+                for doc_id in cached_doc_ids:
+                    if doc_id in self.indexed_file_map:
+                        github_url = self.rag._get_github_url(doc_id)
+                        if github_url:
+                            # Provide both file path (for tools) and GitHub URL (for users)
+                            context_parts.append(f"Source: {doc_id}\nGitHub URL: {github_url}\n{self.indexed_file_map[doc_id]}")
+                        else:
+                            context_parts.append(f"Source: {doc_id}\n{self.indexed_file_map[doc_id]}")
+                
+                return "\n\n".join(context_parts) if context_parts else self.rag.get_context_for_query(query)
+        
+        # Normal RAG search for channel messages or new threads
         return self.rag.get_context_for_query(query)
 
     def construct_query_payload(self, query: str, context: str, conversation_history: list = None) -> dict:
@@ -108,15 +193,21 @@ class LLMService:
         
         # Add conversation history if available
         if conversation_history:
-            full_prompt += "Recent conversation history:\n"
+            full_prompt += "Recent conversation history (most recent messages leading up to current query):\n"
             for msg in conversation_history:
                 user_id = msg.get("user", "Unknown")
                 text = msg.get("text", "")
-                # Format user mentions nicely
-                if user_id.startswith("U"):
-                    full_prompt += f"<@{user_id}>: {text}\n"
+                is_bot = msg.get("is_bot", False)
+                
+                if is_bot:
+                    # This is Nancy's previous response
+                    full_prompt += f"Nancy: {text}\n"
                 else:
-                    full_prompt += f"{user_id}: {text}\n"
+                    # This is a user message
+                    if user_id.startswith("U"):
+                        full_prompt += f"<@{user_id}>: {text}\n"
+                    else:
+                        full_prompt += f"{user_id}: {text}\n"
             full_prompt += "\n"
         
         full_prompt += (
@@ -180,11 +271,12 @@ class LLMService:
             logger.error(f"Exception in querry_llm: {e}")
             return None, None
 
-    def call_llm_with_callback(self, query: str, callback_fn, conversation_history: list = None):
+    def call_llm_with_callback(self, query: str, callback_fn, conversation_history: list = None, thread_ts: str = None):
         """
         Process a query with a callback function for sending intermediate updates.
         callback_fn(message: str, is_final: bool = False)
         conversation_history: list of recent messages for context
+        thread_ts: Slack thread timestamp for context caching
         """
         import logging
         logger = logging.getLogger(__name__)
@@ -194,7 +286,12 @@ class LLMService:
             logger.info(f"Using conversation history with {len(conversation_history)} messages")
             if self.debugging:
                 for i, msg in enumerate(conversation_history):
-                    logger.info(f"  Message {i+1}: {msg.get('user', 'Unknown')}: {msg.get('text', '')[:100]}...")
+                    user = msg.get('user', 'Unknown')
+                    text = msg.get('text', '')[:100]
+                    is_bot = msg.get('is_bot', False)
+                    logger.info(f"  Message {i+1}: {'[BOT] ' if is_bot else ''}#{user}: {text}...")
+        else:
+            logger.info("No conversation history provided")
         
         # Initialize the turn variables
         payload = None
@@ -206,10 +303,10 @@ class LLMService:
         # Send initial status
         callback_fn("  :mag: _Searching for relevant information in knowledge base_", False)
 
-        # Get the initial context
-        logger.info("Getting initial context from RAG")
-        context = self.get_initial_context(query)
-        logger.info(f"RAG context length: {len(context)}")
+        # Get the initial context (from thread cache or RAG)
+        logger.info("Getting initial context")
+        context = self.get_initial_context(query, thread_ts)
+        logger.info(f"Context length: {len(context)}")
 
         # Construct the initial payload
         logger.info("Constructing query payload")
@@ -252,7 +349,7 @@ class LLMService:
 
                 # Loop through the requested file paths
                 for file_path in file_paths:
-                    callback_fn(f"  :page_facing_up: _Retrieving file: {file_path}_", False)
+                    callback_fn(f"  :page_facing_up: _Retrieving file:_ `{file_path}`", False)
                     # Skip if file already in context
                     if file_path in context_files:
                         continue
@@ -348,20 +445,50 @@ class LLMService:
                 searching = False
 
             # Exit the loop if the agent has requested it
-            if "[AWAIT]" in llm_text:
+            if "[DONE]" in llm_text:
                 searching = False
+                # If DONE was used without a RESPONSE, send a fallback message
+                if "RESPONSE" not in llm_text:
+                    callback_fn("  :thinking_face: _Analysis complete - awaiting further instructions_", True)
 
             turn += 1
 
         # If we finished without a response, send a fallback
         if searching == False and turn >= self.max_turns:
             callback_fn("  :warning: _Reached thinking limit - providing available results_", True)
+        
+        # Update thread context cache with files Nancy looked at in this session
+        if thread_ts and context_files:
+            import time
+            current_time = time.time()
+            
+            if thread_ts not in self.thread_retrievals:
+                self.thread_retrievals[thread_ts] = (current_time, [])
+            
+            # Add new files to the thread cache and trim to last 3
+            timestamp, cached_files = self.thread_retrievals[thread_ts]
+            new_files = list(context_files)
+            cached_files.extend(new_files)
+            cached_files = cached_files[-3:]  # Keep only last 3 files
+            
+            # Update with new timestamp and trimmed file list
+            self.thread_retrievals[thread_ts] = (current_time, cached_files)
+            
+            if self.debugging:
+                logger.info(f"Updated thread {thread_ts} cache: {cached_files}")
+            
+            # Save after updating
+            self._save_thread_cache()
+            
+            # Prune old threads (keep only 50 most recent)
+            self._prune_thread_cache()
 
-    def call_llm(self, query: str, conversation_history: list = None) -> str:
+    def call_llm(self, query: str, conversation_history: list = None, thread_ts: str = None) -> str:
         """
         Process a query and return the final response.
         Collects all intermediate responses and returns the final compiled answer.
         conversation_history: list of recent messages for context
+        thread_ts: Slack thread timestamp for context caching
         """
         # Initialize the turn variables
         payload = None
@@ -371,8 +498,8 @@ class LLMService:
         meta_prompt = ""
         collected_responses = []  # Collect responses during turns
 
-        # Get the initial context
-        context = self.get_initial_context(query)
+        # Get the initial context (from thread cache or RAG)
+        context = self.get_initial_context(query, thread_ts)
 
         # Construct the initial payload
         payload = self.construct_query_payload(query, context, conversation_history)
@@ -477,10 +604,33 @@ class LLMService:
                 searching = False
 
             # Exit the loop if the agent has requested it
-            if "[AWAIT]" in llm_text:
+            if "[DONE]" in llm_text:
                 searching = False
 
             turn += 1
+
+        # Update thread context cache with files Nancy looked at in this session
+        if thread_ts and context_files:
+            import time
+            current_time = time.time()
+            
+            if thread_ts not in self.thread_retrievals:
+                self.thread_retrievals[thread_ts] = (current_time, [])
+            
+            # Add new files to the thread cache and trim to last 3
+            timestamp, cached_files = self.thread_retrievals[thread_ts]
+            new_files = list(context_files)
+            cached_files.extend(new_files)
+            cached_files = cached_files[-3:]  # Keep only last 3 files
+            
+            # Update with new timestamp and trimmed file list
+            self.thread_retrievals[thread_ts] = (current_time, cached_files)
+            
+            # Save after updating
+            self._save_thread_cache()
+            
+            # Prune old threads (keep only 50 most recent)
+            self._prune_thread_cache()
 
         # Return the final compiled response
         if collected_responses:

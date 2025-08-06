@@ -19,12 +19,13 @@ def test_rag_service():
     print("=== Testing RAG Service ===\n")
     
     try:
-        from rag_service import get_rag_service
+        from plugins.rag.rag_service import RAGService
         
         # Get the RAG service
-        rag = get_rag_service()
+        rag = RAGService()
         
-        if not rag.is_available():
+        # Check if embeddings exist instead of is_available()
+        if not hasattr(rag, 'embeddings') or rag.embeddings is None:
             print("❌ RAG service not available")
             print("Make sure to run the knowledge base build first:")
             print("python scripts/build_knowledge_base.py --category microlens_submit --dirty")
