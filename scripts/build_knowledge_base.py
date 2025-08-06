@@ -27,6 +27,44 @@ try:
 except ImportError:
     TIKA_AVAILABLE = False
 
+import shutil
+
+def get_file_type_category(doc_id: str) -> str:
+    """
+    Determine if file should be treated as code, mixed content, or documentation
+    for dual embedding model weighting.
+    
+    Args:
+        doc_id: Document identifier (path-like string)
+        
+    Returns:
+        'code', 'mixed', or 'docs'
+    """
+    path = Path(doc_id)
+    
+    # Direct code files
+    code_extensions = {'.py', '.js', '.ts', '.cpp', '.java', '.go', '.rs', '.c', '.h', '.css', '.scss', '.jsx', '.tsx'}
+    if path.suffix in code_extensions:
+        return 'code'
+    
+    # Converted notebooks (mixed code + documentation) 
+    if '.nb' in path.suffixes or '.nb.txt' in str(path):
+        return 'mixed'
+    
+    # Configuration files (often contain structured data that benefits from code understanding)
+    config_extensions = {'.json', '.yaml', '.yml', '.toml', '.ini'}
+    if path.suffix in config_extensions:
+        return 'mixed'
+    
+    # Mixed content (markdown often contains code blocks)
+    mixed_extensions = {'.md', '.rst'}
+    if path.suffix in mixed_extensions:
+        return 'mixed'
+    
+    # Pure documentation
+    return 'docs'
+
+
 def download_pdf_articles(config_path: str, base_path: str = "knowledge_base/raw", dry_run: bool = False, category: str = None, force_update: bool = False) -> dict:
     """Download PDF articles from URLs"""
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -166,6 +204,14 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
         logger.error("txtai not available. Please install with: pip install txtai")
         return
 
+    # Check if dual embedding is enabled
+    use_dual_embedding = os.environ.get("USE_DUAL_EMBEDDING", "true").lower() == "true"
+    code_model = os.environ.get("CODE_EMBEDDING_MODEL", "microsoft/codebert-base")
+    
+    logger.info(f"Dual embedding enabled: {use_dual_embedding}")
+    if use_dual_embedding:
+        logger.info(f"Code model: {code_model}")
+
     # Initialize Tika for PDF processing
     tika_ready = False
     if TIKA_AVAILABLE:
@@ -190,12 +236,21 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
     embeddings_dir = Path(embeddings_path)
     embeddings_dir.mkdir(parents=True, exist_ok=True)
 
-    # Initialize txtai embeddings
-    embeddings = Embeddings({
+    # Initialize txtai embeddings models
+    general_embeddings = Embeddings({
         "path": "sentence-transformers/all-MiniLM-L6-v2",
         "content": True,
         "backend": "faiss"
     })
+    
+    code_embeddings = None
+    if use_dual_embedding:
+        code_embeddings = Embeddings({
+            "path": code_model,
+            "content": True,
+            "backend": "faiss"
+        })
+        logger.info(f"Initialized code embeddings with model: {code_model}")
 
     # Load extension weights from YAML
     try:
@@ -242,24 +297,28 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
             # --- nb4llm notebook conversion step ---
             if convert_ipynb_to_txt is not None:
                 for ipynb_file in repo_dir.rglob("*.ipynb"):
-                    txt_file = ipynb_file.with_suffix(".txt")
-                    # Only convert if .txt does not exist or is older than .ipynb
-                    if not txt_file.exists() or ipynb_file.stat().st_mtime > txt_file.stat().st_mtime:
+                    # Use .nb.txt extension to preserve notebook identity
+                    nb_txt_file = ipynb_file.with_suffix(".nb.txt")
+                    # Only convert if .nb.txt does not exist or is older than .ipynb
+                    if not nb_txt_file.exists() or ipynb_file.stat().st_mtime > nb_txt_file.stat().st_mtime:
                         try:
-                            logger.info(f"Converting {ipynb_file} to {txt_file} using nb4llm...")
-                            convert_ipynb_to_txt(str(ipynb_file), str(txt_file))
+                            logger.info(f"Converting {ipynb_file} to {nb_txt_file} using nb4llm...")
+                            convert_ipynb_to_txt(str(ipynb_file), str(nb_txt_file))
                             failures['successful_notebook_conversions'] += 1
                         except Exception as e:
-                            logger.warning(f"Failed to convert {ipynb_file} to txt: {e}")
+                            logger.warning(f"Failed to convert {ipynb_file} to nb.txt: {e}")
                             failures['failed_notebook_conversions'].append(f"{ipynb_file}: {str(e)}")
             else:
                 logger.warning("nb4llm not available. Skipping notebook conversion.")
             # --- end nb4llm notebook conversion step ---
 
-            # Collect all text files (including .ipynb and .txt)
+            # Collect all text files (excluding .ipynb - we only want the converted .nb.txt versions)
             text_files = []
-            for ext in ['.py', '.md', '.txt', '.rst', '.yaml', '.yml', '.json', '.ipynb']:
+            for ext in ['.py', '.md', '.txt', '.rst', '.yaml', '.yml', '.json']:
                 text_files.extend(repo_dir.rglob(f"*{ext}"))
+            
+            # Add .nb.txt files specifically (converted notebooks)
+            text_files.extend(repo_dir.rglob("*.nb.txt"))
             
             # Collect PDF files from repositories if Tika is available
             pdf_files = []
@@ -375,17 +434,31 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
     if documents:
         logger.info(f"Indexing {len(documents)} documents...")
         if not dry_run:
-            embeddings.index(documents)
+            # Index with general embeddings (always)
+            logger.info("Building general embeddings index...")
+            general_embeddings.index(documents)
+            general_embeddings.save(str(embeddings_dir / "index"))
+            logger.info(f"Saved general embeddings index to {embeddings_dir / 'index'}")
             
-            # Save the embeddings index
-            embeddings.save(str(embeddings_dir / "index"))
-            logger.info(f"Saved embeddings index to {embeddings_dir / 'index'}")
+            # Index with code embeddings if dual embedding enabled
+            if use_dual_embedding and code_embeddings:
+                logger.info("Building code embeddings index...")
+                code_embeddings.index(documents)
+                code_embeddings.save(str(embeddings_dir / "code_index"))
+                logger.info(f"Saved code embeddings index to {embeddings_dir / 'code_index'}")
             
-            # Test search
-            results = embeddings.search("function", 3)
-            logger.info("Test search results:")
+            # Test search on general model
+            results = general_embeddings.search("function", 3)
+            logger.info("Test search results (general model):")
             for result in results:
                 logger.info(f"  - {result['id']}: {result['text'][:100]}...")
+                
+            # Test search on code model if available
+            if use_dual_embedding and code_embeddings:
+                code_results = code_embeddings.search("function", 3)
+                logger.info("Test search results (code model):")
+                for result in code_results:
+                    logger.info(f"  - {result['id']}: {result['text'][:100]}...")
     else:
         logger.warning("No documents found to index")
 
