@@ -429,7 +429,14 @@ class LLMService:
 
                 # Loop through the requested file paths
                 for file_path in file_paths:
-                    callback_fn(f"  :page_facing_up: _Retrieving file:_ `{file_path}`", False)
+                    # Get GitHub URL for display
+                    github_url = self.rag._get_github_url(file_path)
+                    if github_url:
+                        filename = Path(file_path).name
+                        display_link = f"<{github_url}|{filename}>"
+                        callback_fn(f"  :page_facing_up: _Retrieving file:_ {display_link}", False)
+                    else:
+                        callback_fn(f"  :page_facing_up: _Retrieving file:_ `{file_path}`", False)
                     # Skip if file already in context
                     if file_path in context_files:
                         continue

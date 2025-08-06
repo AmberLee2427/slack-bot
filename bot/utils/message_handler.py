@@ -311,10 +311,8 @@ class MessageHandler:
                                            thread_ts: str = None, user_id: str = None):
         """Generate AI response with intermediate updates and conversation context"""
         try:
-            # Format conversation context for the LLM
-            full_query = self.conversation_manager.format_conversation_context(
-                conversation_history or [], query
-            )
+            # Initial search status update
+            await send_callback(":information_source: _Searching knowledge base..._", original_ts)
             
             # Create a queue to collect messages from the LLM thread
             message_queue = queue.Queue()
@@ -335,7 +333,7 @@ class MessageHandler:
             llm_future = loop.run_in_executor(
                 None, 
                 self.llm_service.call_llm_with_callback, 
-                full_query, 
+                query, 
                 sync_callback,
                 conversation_history,
                 thread_ts,  # Pass thread_ts for context caching

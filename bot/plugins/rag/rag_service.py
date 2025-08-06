@@ -252,8 +252,8 @@ class RAGService:
             # Apply file-type-aware weighting
             file_type = get_file_type_category(doc_id)
             if file_type == 'code':
-                # Code files: favor code model
-                dual_score = 0.3 * general_score + 0.7 * code_score
+                # Code files: reduce code model influence to avoid too many low-level files
+                dual_score = 0.6 * general_score + 0.4 * code_score
             elif file_type == 'mixed':
                 # Mixed content: equal weighting
                 dual_score = 0.5 * general_score + 0.5 * code_score

@@ -20,8 +20,9 @@ def search_tool(self, llm_text: str, callback_fn=None) -> str:
             search_content = line.split("SEARCH:")[1].strip()
             raw_query = search_content
             
-            # Only show detailed search info - remove redundant messages
-            # callback_fn(f"  🔍 Searching for: _{raw_query}_", False)  # REMOVED
+            # Show search context
+            if callback_fn:
+                callback_fn(f"  🔍 _Searching for: {raw_query}_", False)
             
             if raw_query.lower().startswith('select'):
                 query_part = raw_query
