@@ -123,7 +123,7 @@ class RAGService:
                     github_url = repo['url']
                     if github_url.endswith('.git'):
                         github_url = github_url[:-4]
-                    return f"{github_url}/blob/main/{file_path}"
+                    return f"{github_url}/blob/master/{file_path}"
         
         return None
     
@@ -364,9 +364,11 @@ class RAGService:
             # Truncate text if needed (allow more content per document)
             text = result['text']
             
-            # Add document info with both file path and GitHub link
+            # Add document info with GitHub link instead of plain filename
             if github_url:
-                doc_info = f"Source: {result['id']}\nGitHub URL: {github_url}\n"
+                # Extract filename for link text
+                filename = result['id'].split('/')[-1]
+                doc_info = f"Source: <{github_url}|{filename}>\n"
             else:
                 doc_info = f"Source: {result['id']}\n"
             
@@ -438,9 +440,11 @@ class RAGService:
             # Allow much more content per document
             text = result['text']
             
-            # Add document info with both file path and GitHub link
+            # Add document info with GitHub link instead of plain filename
             if github_url:
-                doc_info = f"Source: {result['id']}\nGitHub URL: {github_url}\n"
+                # Extract filename for link text
+                filename = result['id'].split('/')[-1]
+                doc_info = f"Source: <{github_url}|{filename}>\n"
             else:
                 doc_info = f"Source: {result['id']}\n"
             

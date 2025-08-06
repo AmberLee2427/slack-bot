@@ -4,6 +4,34 @@
 
 This repository contains a **RAG-powered Slack bot** designed to support participants in the **Roman Galactic Exoplanet Survey - Project Infrastructure Team data challenge**. The bot serves as an intelligent assistant that can answer questions about microlensing analysis, data challenge procedures, and related tools by leveraging a comprehensive knowledge base of microlensing resources.
 
+## Current Status (v3.0 - Dual Embedding System)
+
+### ✅ **Recently Completed**
+- **Dual Embedding Architecture**: General text model (sentence-transformers/all-MiniLM-L6-v2) + Code-specific model (microsoft/codebert-base)
+- **Smart File Type Detection**: Automatic categorization of files as code/mixed/docs for optimal embedding model weighting
+- **Enhanced Knowledge Base Pipeline**: 937 documents indexed with comprehensive failure tracking and monitoring
+- **Model Weights System**: Dynamic document weighting with extension-based and path-based rules
+- **Environment-Driven Configuration**: Dual embedding controlled via .env variables
+- **Notebook Processing**: .nb.txt conversion preserving notebook identity while preventing duplicates
+- **Interactive Slack Features**: Home tab with Block Kit UI, button-based navigation
+
+### 🚀 **New Requirements (v3.1)**
+
+#### 1. **Enhanced Context Presentation**
+- **Links in System Text**: Replace plain filenames with clickable GitHub links in LLM context
+- **Stable GitHub URLs**: Switch from "main" to "master" branch links for better stability
+- **Improved User Experience**: Make source attribution more discoverable and actionable
+
+#### 2. **"Keep Cooking" Feature**
+- **Interactive Continuation**: Add system message with button allowing Nancy to continue/expand responses
+- **User Control**: Let users request deeper analysis or additional perspectives on demand
+- **Seamless Flow**: Maintain conversation context while providing optional expansion
+
+#### 3. **Daily Rate Limiting**
+- **Per-User Limits**: Implement daily usage quotas to manage API costs and ensure fair access
+- **Graceful Degradation**: Informative messages when limits are reached
+- **Admin Overrides**: Configurable limits and bypass mechanisms for power users
+
 ## Repository Structure
 
 ```
@@ -48,19 +76,29 @@ slack-bot/
   - Standalone articles downloaded from URLs in `articles.yml`
 - **Standard text files** → direct processing (.py, .md, .rst, .yml, etc.)
 
-### Stage 3: Unified Embedding Pipeline
-- All processed content (notebooks, PDFs, code, docs) embedded via txtai
-- No intermediate chunking - whole files/documents preserved
-- Extension-based weighting for relevance (configurable via `config/weights.yaml`)
-- Comprehensive vector database for semantic search across all content types
-- **txtai** is used to generate embeddings and build the vector database for semantic search.
+### Stage 3: Dual Embedding Pipeline
+- **General Text Model**: sentence-transformers/all-MiniLM-L6-v2 for documentation and natural language
+- **Code-Specific Model**: microsoft/codebert-base for code files and technical content
+- **Smart Weighting**: File-type-aware scoring (code: 70% code model, mixed: 50/50, docs: 80% general)
+- **Extension-based Weighting**: Configurable via `config/weights.yaml` for relevance optimization
+- **Model Weights**: Individual document scoring stored in `config/model_weights.yaml`
+- **Unified Search**: Merged dual scoring with comprehensive reweighting pipeline
 
-## Retrieval and Weighting Improvements
+## Technical Architecture (v3.0)
 
-- Retrieval was previously polluted by build artifacts and irrelevant files.
-- Introduced extension- and path-based weighting rules (e.g., prioritizing `.py`, `.md`, files with "tutorial" in the path).
-- The LLM is given a tool to dynamically adjust file weights, which has proven effective in practice.
-- Despite improvements, retrieval of code and notebook content is still being refined.
+### Dual Embedding System
+- **Two Embedding Indices**: 
+  - `knowledge_base/embeddings/index/` - General model for text/docs
+  - `knowledge_base/embeddings/code_index/` - Code model for technical content
+- **Intelligent Merging**: Weighted mean scoring based on file type detection
+- **Large Candidate Pools**: 50x limit for reweighting effectiveness  
+- **Environment Configuration**: `USE_DUAL_EMBEDDING=true` and `CODE_EMBEDDING_MODEL=microsoft/codebert-base`
+
+### Search Quality Improvements
+- **File Type Categorization**: Automatic detection of code/mixed/docs content
+- **Multi-Model Scoring**: Complementary embeddings provide better coverage
+- **Advanced Reweighting**: Extension weights + model weights + dual scores
+- **GitHub URL Integration**: Direct links to source files included in all results
 
 ## Key Components
 
@@ -70,38 +108,89 @@ slack-bot/
 - **Apache Tika** (via tika package): PDF text extraction for journal articles
 - **Unified pipeline**: Single build process handles repositories + PDFs + notebooks
 
-## Current Status and Capabilities
+## Current Status and Next Steps
 
-### ✅ **Fully Implemented**
-- **Complete PDF processing**: Both repository-embedded and standalone articles
-- **Notebook conversion**: nb4llm integration for all `.ipynb` files
-- **Multi-source indexing**: Repositories, PDFs, and GitHub Pages sites
-- **Java dependency handling**: Optional PDF processing with graceful fallback
-- **Unified search**: All content types searchable through single txtai index
+### ✅ **Fully Implemented (v3.0)**
+- **Dual Embedding System**: General + code models with intelligent merging
+- **Complete PDF Processing**: Both repository-embedded and standalone articles
+- **Notebook Conversion**: nb4llm integration preventing duplicates with .nb.txt extension
+- **Multi-Source Indexing**: Repositories, PDFs, and GitHub Pages sites
+- **Advanced Weighting**: File-type detection, extension weights, model weights
+- **Interactive Slack Interface**: Home tab with Block Kit UI and button navigation
+- **Failure Tracking**: Comprehensive pipeline monitoring and reporting
 
-### 🔄 **Current Limitations and Next Steps**
-- **Retrieval optimization**: Fine-tuning semantic search relevance
-- **Chunking evaluation**: Consider document-level vs. chunk-level embeddings
-- **Pipeline modularization**: Refactor scripts into importable package
-- **Build artifact filtering**: Continue improving file relevance weighting
+### 🔄 **Priority Implementation Plan (v3.1)**
 
-## Development Workflow (Updated v2.0)
+#### **Phase 1: Enhanced Context Presentation (High Priority)**
+- **GitHub Link Integration**: Replace filenames with clickable links in system messages
+- **Master Branch URLs**: Switch from `/blob/main/` to `/blob/master/` for stability
+- **Implementation**: Modify `get_context_for_query()` and `get_detailed_context()` methods
+- **Timeline**: 1-2 hours
+
+#### **Phase 2: "Keep Cooking" Interactive Feature (Medium Priority)**  
+- **Button Implementation**: Add "Continue Analysis" button to Nancy's responses
+- **Context Preservation**: Maintain conversation state for follow-up expansions
+- **Handler Extension**: Extend `InteractiveHandler` with new button action
+- **Timeline**: 2-3 hours
+
+#### **Phase 3: Daily Rate Limiting (Medium Priority)**
+- **User Tracking**: Implement per-user daily quota system
+- **Storage Backend**: Redis or SQLite for rate limit persistence
+- **Graceful Limits**: Informative messages when quotas exceeded
+- **Admin Config**: Environment-based limit configuration
+- **Timeline**: 3-4 hours
+
+### 🔧 **Technical Debt and Optimizations**
+- **Pipeline Modularization**: Refactor scripts into importable package
+- **Embedding Model Updates**: Evaluate newer models for improved retrieval
+- **Chunking Strategy**: Consider document vs. chunk-level embeddings for very large files
+
+## Development Workflow (v3.0)
 
 1. **Configure sources** in `config/repositories.yml` and `config/articles.yml`
-2. **Build knowledge base**: `python scripts/build_knowledge_base.py --config config/repositories.yml --articles-config config/articles.yml`
-   - Clones/updates repositories
+2. **Build knowledge base**: `python scripts/build_knowledge_base.py --category microlens_submit --dirty`
+   - Clones/updates repositories  
    - Downloads PDF articles from URLs
-   - Converts notebooks via nb4llm  
+   - Converts notebooks via nb4llm (with .nb.txt extension)
    - Extracts PDF text via Tika
-   - Creates unified txtai embeddings index
+   - Creates dual txtai embedding indices (general + code models)
+   - Comprehensive failure tracking and pipeline summary
 3. **Test queries**: `python scripts/demo_query.py "your question here"`
-4. **Deploy bot**: Configure Slack tokens and run Nancy
+4. **Deploy bot**: Configure Slack tokens, set dual embedding environment variables, and run Nancy
 
-## Technical Considerations
+## Technical Considerations (v3.0)
 
-- **Dynamic weighting**: Both static (extension/path) and LLM-driven dynamic weighting are used to improve retrieval relevance.
-- **No intermediate chunking**: All files are embedded as a whole for now.
-- **Continuous improvement**: Ongoing evaluation of retrieval quality, especially for code and notebook content.
+- **Dual Embedding Models**: Complementary general and code-specific models for comprehensive coverage
+- **File Type Intelligence**: Automatic categorization drives optimal model weighting
+- **Large Candidate Pools**: 50x search limits enable effective reweighting without compromising accuracy
+- **GitHub Integration**: Direct source links enhance user experience and source verification
+- **Environment-Driven**: All features controllable via environment variables for deployment flexibility
+- **Performance Optimized**: Nancy is "super fast" - large candidate pools don't impact user experience
+
+## Immediate Next Steps (Recommended Priority Order)
+
+### 1. **GitHub Link Enhancement** (Start Here - Quick Win)
+**Why First**: Simple change with immediate UX improvement, affects core functionality
+- Modify RAG service context methods to use links instead of filenames
+- Switch to master branch for stability  
+- Test with existing dual embedding system
+
+### 2. **Master Branch URL Fix** (Coupled with #1)  
+**Why Second**: Natural coupling with GitHub link work, addresses stability concerns
+- Single line change in `_get_github_url()` method
+- Immediate stability improvement for existing links
+
+### 3. **"Keep Cooking" Feature** (High Impact)
+**Why Third**: Leverages existing interactive infrastructure, major UX enhancement
+- Extends existing `InteractiveHandler` capabilities
+- Provides user control over response depth
+- Maintains conversation context
+
+### 4. **Daily Rate Limiting** (Resource Management)
+**Why Fourth**: Important for cost control but requires new infrastructure
+- Implement user tracking and quota system
+- Add graceful degradation messaging
+- Configure admin overrides
 
 ## Git Strategy
 
