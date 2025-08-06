@@ -141,6 +141,7 @@ knowledge_base/raw/
 knowledge_base/chunked/
 # Embeddings indexes (generated, can be regenerated)
 knowledge_base/embeddings/
+knowledge_base/embeddings_*/
 # Model caches and temporary files
 knowledge_base/embeddings/models/
 *.sqlite-journal

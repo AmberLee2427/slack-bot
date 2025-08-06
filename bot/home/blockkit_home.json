@@ -44,7 +44,7 @@
 					"type": "button",
 					"text": {
 						"type": "plain_text",
-						"text": "Research Articles",
+						"text": "Articles",
 						"emoji": true
 					},
 					"value": "view_articles",
@@ -54,7 +54,7 @@
 					"type": "button",
 					"text": {
 						"type": "plain_text",
-						"text": "Code Repositories",
+						"text": "Code Repos",
 						"emoji": true
 					},
 					"value": "view_repos",

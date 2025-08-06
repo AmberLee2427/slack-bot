@@ -19,11 +19,13 @@ try:
 except ImportError:
     convert_ipynb_to_txt = None
 
-# Add import for txtai Textractor
+# Add import for direct Tika PDF processing
 try:
-    from txtai.pipeline import Textractor
+    import tika
+    from tika import parser as tika_parser
+    TIKA_AVAILABLE = True
 except ImportError:
-    Textractor = None
+    TIKA_AVAILABLE = False
 
 def download_pdf_articles(config_path: str, base_path: str = "knowledge_base/raw", dry_run: bool = False, category: str = None, force_update: bool = False) -> None:
     """Download PDF articles from URLs"""
@@ -134,19 +136,15 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
         logger.error("txtai not available. Please install with: pip install txtai")
         return
 
-    # Initialize Textractor for PDF processing
-    textractor = None
-    if Textractor is not None:
+    # Initialize Tika for PDF processing
+    tika_ready = False
+    if TIKA_AVAILABLE:
         try:
-            textractor = Textractor(
-                paragraphs=True,
-                minlength=50,
-                join=True,
-                sections=True
-            )
-            logger.info("✅ Textractor initialized for PDF processing")
+            tika.initVM()
+            tika_ready = True
+            logger.info("✅ Tika VM initialized for PDF processing")
         except Exception as e:
-            logger.warning(f"Failed to initialize Textractor: {e}")
+            logger.warning(f"Failed to initialize Tika VM: {e}")
 
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
@@ -218,9 +216,15 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
             for ext in ['.py', '.md', '.txt', '.rst', '.yaml', '.yml', '.json', '.ipynb']:
                 text_files.extend(repo_dir.rglob(f"*{ext}"))
             
-            # Skip common directories
+            # Collect PDF files from repositories if Tika is available
+            pdf_files = []
+            if tika_ready:
+                pdf_files.extend(repo_dir.rglob("*.pdf"))
+            
+            # Skip common directories for both text and PDF files
             skip_dirs = {'.git', '.github', '__pycache__', 'node_modules', '.pytest_cache', '.mypy_cache'}
             text_files = [f for f in text_files if not any(skip in f.parts for skip in skip_dirs)]
+            pdf_files = [f for f in pdf_files if not any(skip in f.parts for skip in skip_dirs)]
 
             # Skip Sphinx build files and .rst.txt artifacts
             text_files = [f for f in text_files if 'docs/build' not in str(f) and not str(f).endswith('.rst.txt')]
@@ -243,6 +247,30 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
                     
                 except Exception as e:
                     logger.warning(f"Error reading {file_path}: {e}")
+            
+            # Process PDF files found in repository
+            for pdf_path in pdf_files:
+                try:
+                    # Extract text from PDF using direct Tika parser
+                    parsed = tika_parser.from_file(str(pdf_path))
+                    content = parsed.get('content', '') if parsed else ''
+                    
+                    if content and len(content.strip()) > 100:
+                        # Create document ID
+                        doc_id = f"{cat}/{repo_name}/{pdf_path.relative_to(repo_dir)}"
+                        
+                        # Add metadata to content
+                        metadata = f"Source: Repository PDF from {repo['url']}\nPath: {pdf_path.relative_to(repo_dir)}\nType: Repository Document\n\n"
+                        full_content = metadata + content.strip()
+                        
+                        # Add to documents list
+                        documents.append((doc_id, full_content))
+                        logger.info(f"Added repository PDF {doc_id} ({len(content)} chars)")
+                    else:
+                        logger.warning(f"Failed to extract meaningful text from repository PDF {pdf_path}")
+                        
+                except Exception as e:
+                    logger.error(f"Error processing repository PDF {pdf_path}: {e}")
     
     # Process PDF articles
     article_categories = [category] if category else list(articles_config.keys())
@@ -264,10 +292,11 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
                 logger.info(f"[DRY RUN] Would process PDF {pdf_file}")
                 continue
 
-            if textractor is not None:
+            if tika_ready:
                 try:
-                    # Extract text from PDF using Textractor
-                    content = textractor(str(pdf_file))
+                    # Extract text from PDF using direct Tika parser
+                    parsed = tika_parser.from_file(str(pdf_file))
+                    content = parsed.get('content', '') if parsed else ''
                     
                     if content and len(content.strip()) > 100:
                         # Create document ID
@@ -275,7 +304,7 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
                         
                         # Add metadata to content
                         metadata = f"Title: {article['description']}\nSource: {article.get('url', 'Unknown')}\nType: Journal Article\n\n"
-                        full_content = metadata + content
+                        full_content = metadata + content.strip()
                         
                         # Add to documents list
                         documents.append((doc_id, full_content))
@@ -286,7 +315,7 @@ def build_txtai_index(config_path: str, articles_config_path: str = None, base_p
                 except Exception as e:
                     logger.error(f"Error processing PDF {pdf_file}: {e}")
             else:
-                logger.warning(f"Textractor not available. Skipping PDF {pdf_file}")
+                logger.warning(f"Tika not available. Skipping PDF {pdf_file}")
     
     if documents:
         logger.info(f"Indexing {len(documents)} documents...")

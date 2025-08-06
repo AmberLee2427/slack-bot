@@ -33,21 +33,26 @@ slack-bot/
 └── AGENTS.md                    # This file - AI agent guide
 ```
 
-## Data Pipeline (Current)
+## Data Pipeline (Current - v2.0)
 
 ### Stage 1: Raw Resources (`knowledge_base/raw/`)
-- **Source repositories**: Git clones of microlensing tools, notebooks, etc.
-- **Web content**: Scraped or downloaded resources from Microlensing Source
-- **Documents**: PDFs, markdown files, etc.
+- **Git repositories**: Cloned microlensing tools, notebooks, documentation sites
+- **PDF articles**: Downloaded from journal/arXiv URLs via `config/articles.yml`
+- **GitHub Pages sites**: Cloned as repositories (e.g., rges-pit.github.io)
 - **Purpose**: Original, unprocessed source material
 
-### Stage 2: Notebook Conversion (via nb4llm)
-- **Jupyter notebooks** (`.ipynb`) are converted to plain text files with fenced code blocks for each cell using `nb4llm`.
-- This conversion strips metadata/outputs and preserves semantic intent for better retrieval.
-- Currently, this is tested on generated notebooks; integration with real repo notebooks is planned.
+### Stage 2: Multi-Format Processing
+- **Jupyter notebooks** (`.ipynb`) → converted to plain text via `nb4llm` 
+- **PDF files** → text extraction via Apache Tika (requires Java 8+)
+  - Repository-embedded PDFs automatically discovered and processed
+  - Standalone articles downloaded from URLs in `articles.yml`
+- **Standard text files** → direct processing (.py, .md, .rst, .yml, etc.)
 
-### Stage 3: Embedding (No Chunking)
-- All files (including converted notebooks) are embedded as whole files (no intermediate chunking step).
+### Stage 3: Unified Embedding Pipeline
+- All processed content (notebooks, PDFs, code, docs) embedded via txtai
+- No intermediate chunking - whole files/documents preserved
+- Extension-based weighting for relevance (configurable via `config/weights.yaml`)
+- Comprehensive vector database for semantic search across all content types
 - **txtai** is used to generate embeddings and build the vector database for semantic search.
 
 ## Retrieval and Weighting Improvements
@@ -60,24 +65,37 @@ slack-bot/
 ## Key Components
 
 - **txtai**: Embeddings database for semantic search and RAG
-- **slack-machine**: Slack bot framework with plugin system
+- **slack-machine**: Slack bot framework with plugin system  
 - **nb4llm**: Jupyter notebook to plain text converter for improved semantic retrieval
+- **Apache Tika** (via tika package): PDF text extraction for journal articles
+- **Unified pipeline**: Single build process handles repositories + PDFs + notebooks
 
-## Current Limitations and Next Steps
+## Current Status and Capabilities
 
-- **Jupyter notebook retrieval**: Notebooks are now converted, but this is not yet fully integrated/tested on real repo notebooks.
-- **Multivector retrieval**: There is ongoing discussion about using additional code-centric embedding models to improve code/documentation retrieval.
-- **Chunking**: The pipeline currently embeds whole files; chunking strategies may be revisited for better granularity.
-- **Build artifacts**: Extension/path-based weighting helps, but further filtering or smarter indexing may be needed.
-- **nb4llm integration**: The intent is to make nb4llm a standard part of the pipeline for all notebook sources.
-- **Pipeline refactor needed**: Refactor pipeline logic (currently in scripts/) into an importable package/module for easier testing and reuse.
+### ✅ **Fully Implemented**
+- **Complete PDF processing**: Both repository-embedded and standalone articles
+- **Notebook conversion**: nb4llm integration for all `.ipynb` files
+- **Multi-source indexing**: Repositories, PDFs, and GitHub Pages sites
+- **Java dependency handling**: Optional PDF processing with graceful fallback
+- **Unified search**: All content types searchable through single txtai index
 
-## Development Workflow (Updated)
+### 🔄 **Current Limitations and Next Steps**
+- **Retrieval optimization**: Fine-tuning semantic search relevance
+- **Chunking evaluation**: Consider document-level vs. chunk-level embeddings
+- **Pipeline modularization**: Refactor scripts into importable package
+- **Build artifact filtering**: Continue improving file relevance weighting
 
-1. **Clone repositories** into `knowledge_base/raw/`.
-2. **Convert Jupyter notebooks** to plain text using `nb4llm` (planned for all repos).
-3. **Embed all files** (including converted notebooks) using txtai.
-4. **Run and test queries** using `scripts/demo_query.py`.
+## Development Workflow (Updated v2.0)
+
+1. **Configure sources** in `config/repositories.yml` and `config/articles.yml`
+2. **Build knowledge base**: `python scripts/build_knowledge_base.py --config config/repositories.yml --articles-config config/articles.yml`
+   - Clones/updates repositories
+   - Downloads PDF articles from URLs
+   - Converts notebooks via nb4llm  
+   - Extracts PDF text via Tika
+   - Creates unified txtai embeddings index
+3. **Test queries**: `python scripts/demo_query.py "your question here"`
+4. **Deploy bot**: Configure Slack tokens and run Nancy
 
 ## Technical Considerations
 

@@ -2,7 +2,24 @@
 
 > AKA: Nancy
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](h5. **Create configuration**
+   Create `bot/config/.env` with your tokens:
+   ```env
+   # Slack Configuration
+   SLACK_BOT_TOKEN=xoxb-your-bot-token-from-step-4
+   SLACK_SIGNING_SECRET=your-signing-secret-from-slack-app
+   
+   # LLM Configuration  
+   GEMINI_API_KEY=your-gemini-api-key
+   GEMINI_MODEL=gemini-2.0-flash-lite
+   
+   # Logging
+   LOG_LEVEL=INFO
+   DEBUG_LLM=True
+   
+   # Knowledge Base
+   KNOWLEDGE_BASE_PATH=knowledge_base/embeddings
+   ```/opensource.org/licenses/MIT)
 
 An intelligent Slack bot designed to support participants in the **Roman Galactic Exoplanet Survey - Project Infrastructure Team data challenge**. This bot leverages advanced AI techniques to provide context-aware assistance with microlensing analysis, data challenge procedures, and related tools.
 
@@ -46,47 +63,97 @@ The bot has access to:
 This bot is built using a sophisticated three-stage data pipeline:
 
 ```
-Raw Repositories     →     Chunked Content     →      Embeddings Database
+Raw Sources          →     Multi-Format Processing     →      Unified Embeddings
      ↓                            ↓                            ↓
-  Git clones       TBD (currently chunking by file)     txtai embeddings
+Git repositories              nb4llm (notebooks)            txtai vector database
+PDF articles                 Apache Tika (PDFs)                    ↓
+GitHub Pages sites           Direct text (code/docs)          Semantic search
 ```
-1. **Raw Stage**: Original repositories and resources
-2. **Chunked Stage**: Semantic chunks ready for AI processing
-3. **Embeddings Stage**: Vector database for fast semantic search
+1. **Raw Stage**: Git repositories, downloaded PDFs, documentation sites
+2. **Processing Stage**: Format-specific conversion (nb4llm, Tika, direct text)
+3. **Embeddings Stage**: Unified txtai vector database for fast semantic search
 
 ## 🛠️ Setup & Installation
 
 ### Prerequisites
-- Python 3.9 or higher
+- Python 3.12 or higher
 - Git
 - Slack workspace with admin permissions
+- **Java 8+ (for PDF processing)** - required for processing journal articles
 
 ### Quick Start
 
-1. **Clone the repository**
+1. **Install Java (for PDF processing)**
+   ```bash
+   # macOS (using Homebrew)
+   brew install openjdk
+   
+   # Ubuntu/Debian
+   sudo apt-get install openjdk-11-jdk
+   
+   # Windows (using Chocolatey)
+   choco install openjdk
+   ```
+
+2. **Clone the repository**
    ```bash
    git clone <repository-url>
    cd slack-bot
    ```
 
-2. **Install dependencies**
+3. **Set up ngrok for development**
+   Nancy needs a public URL for Slack to send events. Install and start ngrok:
+   ```bash
+   # Install ngrok (if not already installed)
+   # macOS: brew install ngrok
+   # Or download from https://ngrok.com/download
+   
+   # Start ngrok tunnel (in a separate terminal)
+   ngrok http 3000
+   
+   # Copy the public URL (e.g., https://abc123.ngrok-free.app)
+   ```
+
+4. **Install dependencies**
    ```bash
    # Using uv (recommended)
    uv sync
    
    # Or using pip
-   pip install -r requirements.txt
+   pip install -e .
+   
+   # For PDF processing capabilities (optional)
+   pip install -e .[pdf]
    ```
 
 3. **Configure Slack**
-   - Create a new Slack app at api.slack.com/apps](https://api.slack.com/apps)
+   
+   The easiest way to set up your Slack app is using the provided manifest:
+
+   **Option A: Use the Provided Manifest (Recommended)**
+   1. Go to [api.slack.com/apps](https://api.slack.com/apps)
+   2. Click **"Create New App"**
+   3. Select **"From an app manifest"**
+   4. Choose your workspace
+   5. Copy the entire contents of [`manifest.json`](manifest.json) and paste it
+   6. **Important**: Update the `request_url` fields in the manifest to match your ngrok URL:
+      ```json
+      "request_url": "https://YOUR-NGROK-URL.ngrok-free.app/slack/events"
+      ```
+   7. Click **"Create"** and then **"Install to Workspace"**
+   8. Copy your **Bot User OAuth Token** (starts with `xoxb-`)
+
+   **Option B: Manual Setup**
+   - Create a new Slack app at [api.slack.com/apps](https://api.slack.com/apps)
    - Add the following OAuth scopes:
-     - `chat:write`
-     - `app_mentions:read`
-     - `channels:history`
-     - `commands`
-     - to do: fill in the rest of these, or create a manifest 
-   - Copy your Bot Token and App Token
+     - `app_mentions:read`, `channels:history`, `chat:write`, `channels:read`
+     - `files:read`, `groups:history`, `groups:read`, `im:history`, `im:read`, `im:write`
+     - `reactions:read`, `links.embed:write`, `links:read`, `reactions:write`
+     - `metadata.message:read`, `mpim:history`, `mpim:read`, `users:read`
+   - Enable **Event Subscriptions** with these events:
+     - `app_home_opened`, `app_mention`, `message.channels`, `message.groups`, `message.im`, `message.mpim`
+   - Enable **Interactivity** and **App Home** with Messages Tab
+   - Set your request URLs to your ngrok endpoints
 
 4. **Create configuration**
    Edit/Create `bot/config/.env`:
@@ -97,14 +164,43 @@ Raw Repositories     →     Chunked Content     →      Embeddings Database
 
 5. **Build the knowledge base**
    ```bash
-   # This will process all microlensing repositories
-   python scripts/build_knowledge_base.py
+   # Process repositories only (no PDF processing)
+   python scripts/build_knowledge_base.py --config config/repositories.yml
+   
+   # Process both repositories and PDF articles (requires Java + Tika)
+   python scripts/build_knowledge_base.py --config config/repositories.yml --articles-config config/articles.yml
    ```
 
-6**Start the bot**
+7. **Start Nancy**
    ```bash
-   python -m bot.main
+   # Make sure ngrok is running in another terminal first!
+   python nancy_bot.py
    ```
+
+   Nancy will start on port 3000. You should see:
+   ```
+   Starting Nancy Bot...
+   Nancy Bot ready on http://0.0.0.0:3000
+   Loading embeddings from knowledge_base/embeddings/index
+   Embeddings loaded successfully
+   ```
+
+### 🚨 Troubleshooting Setup
+
+**"Sending messages to this app has been turned off"**
+- Go to your Slack app settings → **App Home**
+- Enable **Messages Tab** and **Allow users to send messages**
+- Reinstall the app to your workspace
+
+**Nancy doesn't respond to direct messages**
+- Check that `message.im` is in your Event Subscriptions
+- Verify your ngrok URL is correct in the manifest
+- Restart Slack client after app changes
+
+**Java/PDF processing errors**
+- Install Java: `brew install openjdk` (macOS) or equivalent
+- Verify with: `java -version`
+- PDF processing is optional - Nancy works without it
 
 ## 📖 Usage
 

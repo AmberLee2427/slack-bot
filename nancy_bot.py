@@ -89,12 +89,47 @@ class NancyBot:
             # Handle actual events
             if data.get("type") == "event_callback":
                 event = data["event"]
-                await self.process_message(event)
+                event_type = event.get("type")
                 
+                logger.info(f"Event received - type: {event_type}, full event: {event}")
+                
+                if event_type == "app_home_opened":
+                    await self.handle_home_opened(event)
+                elif event_type in ["message", "app_mention"]:
+                    logger.info(f"Processing message event: {event}")
+                    await self.process_message(event)
+                else:
+                    logger.warning(f"Unhandled event type: {event_type}")
+                    
             return web.Response(text="OK")
             
         except Exception as e:
             logger.error(f"Error handling event: {e}")
+            return web.Response(status=500)
+    
+    async def handle_interactive(self, request: web.Request) -> web.Response:
+        """Handle Slack interactive components (buttons, modals, etc.)"""
+        body = await request.text()
+        
+        try:
+            # Interactive payloads come as form data with a 'payload' field
+            import urllib.parse
+            parsed = urllib.parse.parse_qs(body)
+            payload_str = parsed.get('payload', [''])[0]
+            
+            if not payload_str:
+                logger.error("No payload found in interactive request")
+                return web.Response(status=400)
+            
+            payload = json.loads(payload_str)
+            logger.info(f"Interactive payload: {payload}")
+            
+            await self.handle_interactive_payload(payload)
+            
+            return web.Response(text="OK")
+            
+        except Exception as e:
+            logger.error(f"Error handling interactive component: {e}")
             return web.Response(status=500)
     
     async def process_message(self, event: Dict[str, Any]):
@@ -245,6 +280,188 @@ class NancyBot:
                 return True
                 
         return False
+
+    async def handle_home_opened(self, event: Dict[str, Any]):
+        """Handle when user opens Nancy's Home tab"""
+        user_id = event["user"]
+        
+        try:
+            # Load home page blocks from JSON file
+            home_path = Path(NANCY_BASE_DIR) / "bot" / "home" / "blockkit_home.json"
+            
+            if home_path.exists():
+                with open(home_path, 'r') as f:
+                    home_blocks = json.load(f)
+                    
+                # Publish home view
+                await self.slack_client.views_publish(
+                    user_id=user_id,
+                    view=home_blocks
+                )
+                logger.info(f"Published home view for user {user_id}")
+            else:
+                logger.error(f"Home page template not found at {home_path}")
+                
+        except Exception as e:
+            logger.error(f"Error handling home opened: {e}")
+
+    async def handle_interactive_payload(self, payload: Dict[str, Any]):
+        """Handle interactive components (buttons, etc.)"""
+        user_id = payload["user"]["id"]
+        trigger_id = payload.get("trigger_id")
+        
+        # Handle button actions
+        if payload["type"] == "block_actions":
+            action = payload["actions"][0]
+            action_id = action["action_id"]
+            
+            if action_id == "btn_view_docs":
+                await self.handle_view_docs(user_id, trigger_id)
+            elif action_id == "btn_view_articles":
+                await self.handle_view_articles(user_id, trigger_id)
+            elif action_id == "btn_view_repos":
+                await self.handle_view_repos(user_id, trigger_id)
+            else:
+                logger.warning(f"Unknown action_id: {action_id}")
+
+    async def handle_view_docs(self, user_id: str, trigger_id: str):
+        """Handle 'Challenge Docs' button click"""
+        try:
+            # Create a modal or send a message about challenge docs
+            modal = {
+                "type": "modal",
+                "title": {
+                    "type": "plain_text",
+                    "text": "📋 Challenge Docs"
+                },
+                "close": {
+                    "type": "plain_text",
+                    "text": "Close"
+                },
+                "blocks": [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "*Roman Galactic Exoplanet Survey - Data Challenge Resources*\n\nI have access to comprehensive documentation about:"
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "• **Submission procedures** via `microlens-submit`\n• **Data challenge guidelines** and requirements\n• **Analysis workflows** and best practices\n• **Technical specifications** for Roman telescope\n• **Tutorial notebooks** for microlensing analysis"
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "💬 *Just ask me anything!* Try questions like:\n• \"How do I submit my results?\"\n• \"What are the data challenge requirements?\"\n• \"Show me Roman telescope specifications\""
+                        }
+                    }
+                ]
+            }
+            
+            await self.slack_client.views_open(
+                trigger_id=trigger_id,
+                view=modal
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in handle_view_docs: {e}")
+
+    async def handle_view_articles(self, user_id: str, trigger_id: str):
+        """Handle 'Research Articles' button click"""
+        try:
+            modal = {
+                "type": "modal", 
+                "title": {
+                    "type": "plain_text",
+                    "text": "📚 Articles"
+                },
+                "close": {
+                    "type": "plain_text",
+                    "text": "Close"
+                },
+                "blocks": [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "*Microlensing Research Papers in My Knowledge Base*\n\nI can help you with content from:"
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "• **Foundation papers** (Paczynski 1986, Gould 1992)\n• **Binary lens theory** (Mao & Paczynski 1991)\n• **Planet detection** (Gould & Loeb 1992)\n• **Survey predictions** (Penny et al. 2019)\n• **Review articles** (Gaudi 2012, Mao 2012)\n• **Roman mission reports** (Spergel et al. 2015)"
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "🔍 *Ask me about any research topic!*\n• \"Explain gravitational microlensing theory\"\n• \"What did Penny et al predict for Roman?\"\n• \"Compare different microlensing surveys\""
+                        }
+                    }
+                ]
+            }
+            
+            await self.slack_client.views_open(
+                trigger_id=trigger_id,
+                view=modal
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in handle_view_articles: {e}")
+
+    async def handle_view_repos(self, user_id: str, trigger_id: str):
+        """Handle 'Code Repositories' button click"""
+        try:
+            modal = {
+                "type": "modal",
+                "title": {
+                    "type": "plain_text",
+                    "text": "💻 Code Repos"
+                },
+                "close": {
+                    "type": "plain_text",
+                    "text": "Close"
+                },
+                "blocks": [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "*Open Source Tools & Code in My Knowledge Base*\n\nI can help with documentation and examples from:"
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "• **Analysis tools** (pyLIMA, MulensModel, VBMicrolensing)\n• **Roman simulators** (romanisim, gulls, PopSyCLE)\n• **Statistical tools** (emcee, dynesty, corner)\n• **Tutorial notebooks** (microlensing-tutorials)\n• **Data challenge tools** (microlens-submit)\n• **Roman pipeline** (romancal, roman_tools)"
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "🛠️ *Get coding help and examples!*\n• \"How do I use pyLIMA for fitting?\"\n• \"Show me MulensModel examples\"\n• \"What's the difference between analysis tools?\""
+                        }
+                    }
+                ]
+            }
+            
+            await self.slack_client.views_open(
+                trigger_id=trigger_id,
+                view=modal
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in handle_view_repos: {e}")
 
     async def get_conversation_history(self, channel_id, thread_ts=None, limit=10):
         """
@@ -412,6 +629,7 @@ async def create_app() -> web.Application:
     bot = NancyBot()
     
     app.router.add_post("/slack/events", bot.handle_event)
+    app.router.add_post("/slack/interactive", bot.handle_interactive)
     
     return app
 
