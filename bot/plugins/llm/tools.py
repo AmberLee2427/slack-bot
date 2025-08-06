@@ -20,8 +20,8 @@ def search_tool(self, llm_text: str, callback_fn=None) -> str:
             search_content = line.split("SEARCH:")[1].strip()
             raw_query = search_content
             
-            if callback_fn:
-                callback_fn(f"  🔍 Searching for: _{raw_query}_", False)
+            # Only show detailed search info - remove redundant messages
+            # callback_fn(f"  🔍 Searching for: _{raw_query}_", False)  # REMOVED
             
             if raw_query.lower().startswith('select'):
                 query_part = raw_query
@@ -34,8 +34,9 @@ def search_tool(self, llm_text: str, callback_fn=None) -> str:
                 query_part = raw_query[:-8]
                 results = self.rag.search(query_part, limit=llm_search_max_results)
             
-            if callback_fn and results:
-                callback_fn(f"  📊 Found {len(results)} relevant sources", False)
+            # Remove redundant "Found X sources" message
+            # if callback_fn and results:
+            #     callback_fn(f"  📊 Found {len(results)} relevant sources", False)  # REMOVED
                 
             # Update the context for the next turn
             meta_prompt += f"\n\nSearch results:\n{query_part}\n"

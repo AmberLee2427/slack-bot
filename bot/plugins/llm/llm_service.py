@@ -374,8 +374,8 @@ class LLMService:
         context_files = set()
         meta_prompt = ""
         
-        # Send initial status
-        callback_fn("  :mag: _Searching for relevant information in knowledge base_", False)
+        # Remove initial status message - too verbose
+        # callback_fn("  :mag: _Searching for relevant information in knowledge base_", False)  # REMOVED
 
         # Get the initial context (from thread cache or RAG)
         logger.info("Getting initial context")
@@ -396,13 +396,13 @@ class LLMService:
             if llm_text is None:
                 logger.error("LLM returned None - stopping")
                 searching = False  # exit the loop
-                callback_fn("  :x: _Failed to connect to Gemini API_", True)
+                callback_fn("  :x: _Failed to connect to Gemini API_", True, hit_turn_limit=False)
                 return
             
             # Check if this is a rate limit response
             if "🚫 *Daily Limit Reached*" in llm_text:
                 logger.info("Rate limit response detected - stopping processing")
-                callback_fn(llm_text, True)  # Send rate limit message as final response
+                callback_fn(llm_text, True, hit_turn_limit=False)  # Send rate limit message as final response
                 return
             # --- END QUERY LLM ---
 
@@ -457,7 +457,8 @@ class LLMService:
 
             # --- SEARCH tool handler ---
             if "SEARCH:" in llm_text:
-                callback_fn("  :mag_right: _Performing targeted search_", False)
+                # Remove redundant "Performing targeted search" message
+                # callback_fn("  :mag_right: _Performing targeted search_", False)  # REMOVED
                 meta_prompt_addition = self.search_tool(
                     self,
                     llm_text, callback_fn
@@ -489,7 +490,7 @@ class LLMService:
                     if response_text:
                         if self.debugging:
                             logger.info("Sending response to callback")
-                        callback_fn(response_text, True)  # Mark as final response
+                        callback_fn(response_text, True, hit_turn_limit=False)  # Mark as final response, didn't hit limit
                         if self.debugging:
                             logger.info("Response sent to callback successfully")
                     else:
@@ -529,13 +530,13 @@ class LLMService:
                 searching = False
                 # If DONE was used without a RESPONSE, send a fallback message
                 if "RESPONSE" not in llm_text:
-                    callback_fn("  :thinking_face: _Analysis complete - awaiting further instructions_", True)
+                    callback_fn("  :thinking_face: _Analysis complete - awaiting further instructions_", True, hit_turn_limit=False)
 
             turn += 1
 
         # If we finished without a response, send a fallback
         if searching == False and turn >= self.max_turns:
-            callback_fn("  :warning: _Reached thinking limit - providing available results_", True)
+            callback_fn("  :warning: _Reached thinking limit - providing available results_", True, hit_turn_limit=True)
         
         # Update thread context cache with files Nancy looked at in this session
         if thread_ts and context_files:

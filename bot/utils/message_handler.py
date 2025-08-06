@@ -101,9 +101,9 @@ class MessageHandler:
                     return
                 
                 # Create a callback for sending intermediate messages
-                async def send_message(text: str, thread_ts: str = None, is_final: bool = False):
-                    if is_final:
-                        # Send final response with "Keep Cooking" button
+                async def send_message(text: str, thread_ts: str = None, is_final: bool = False, hit_turn_limit: bool = False):
+                    if is_final and hit_turn_limit:
+                        # Only show "Keep Cooking" button when Nancy actually hit the turn limit
                         blocks = [
                             {
                                 "type": "section",
@@ -134,6 +134,13 @@ class MessageHandler:
                             channel=channel,
                             text=text,  # Fallback text for notifications
                             blocks=blocks,
+                            thread_ts=thread_ts or event.get("ts")
+                        )
+                    elif is_final:
+                        # Send final response without Keep Cooking button (Nancy finished early)
+                        await self.slack_client.send_message(
+                            channel=channel,
+                            text=text,
                             thread_ts=thread_ts or event.get("ts")
                         )
                     else:
@@ -309,9 +316,6 @@ class MessageHandler:
                 conversation_history or [], query
             )
             
-            # Send initial status update
-            await send_callback("Searching knowledge base...", original_ts)
-            
             # Create a queue to collect messages from the LLM thread
             message_queue = queue.Queue()
             
@@ -319,10 +323,10 @@ class MessageHandler:
             loop = asyncio.get_event_loop()
             
             # Create a callback that the LLM service can use to queue messages
-            def sync_callback(message: str, is_final: bool = False):
-                logger.info(f"Callback received: is_final={is_final}, message='{message[:100]}...'")
+            def sync_callback(message: str, is_final: bool = False, hit_turn_limit: bool = False):
+                logger.info(f"Callback received: is_final={is_final}, hit_turn_limit={hit_turn_limit}, message='{message[:100]}...'")
                 try:
-                    message_queue.put((message, is_final))
+                    message_queue.put((message, is_final, hit_turn_limit))
                     logger.info("Message queued successfully")
                 except Exception as e:
                     logger.error(f"Error queuing message: {e}", exc_info=True)
@@ -343,9 +347,9 @@ class MessageHandler:
                 try:
                     # Check for new messages with a timeout
                     logger.info("Checking for queued messages...")
-                    message, is_final = message_queue.get(timeout=0.1)
-                    logger.info(f"Processing queued message: is_final={is_final}")
-                    await send_callback(message, original_ts, is_final)
+                    message, is_final, hit_turn_limit = message_queue.get(timeout=0.1)
+                    logger.info(f"Processing queued message: is_final={is_final}, hit_turn_limit={hit_turn_limit}")
+                    await send_callback(message, original_ts, is_final, hit_turn_limit)
                     logger.info("Message sent successfully")
                     message_queue.task_done()
                 except queue.Empty:
@@ -360,9 +364,9 @@ class MessageHandler:
             # Process any remaining messages
             logger.info("Processing any remaining messages...")
             while not message_queue.empty():
-                message, is_final = message_queue.get()
-                logger.info(f"Processing remaining message: is_final={is_final}")
-                await send_callback(message, original_ts)
+                message, is_final, hit_turn_limit = message_queue.get()
+                logger.info(f"Processing remaining message: is_final={is_final}, hit_turn_limit={hit_turn_limit}")
+                await send_callback(message, original_ts, is_final, hit_turn_limit)
                 message_queue.task_done()
             
             # Wait for the LLM to complete
@@ -370,7 +374,7 @@ class MessageHandler:
             
         except Exception as e:
             logger.error(f"Error generating response: {e}")
-            await send_callback("Sorry, I encountered an error processing your request.", original_ts, is_final=True)
+            await send_callback("Sorry, I encountered an error processing your request.", original_ts, is_final=True, hit_turn_limit=False)
 
     async def generate_response(self, query: str) -> str:
         """Generate AI response using RAG + LLM"""
