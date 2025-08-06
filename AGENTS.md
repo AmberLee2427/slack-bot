@@ -192,6 +192,127 @@ slack-bot/
 - Add graceful degradation messaging
 - Configure admin overrides
 
+## Admin Guide: Rate Limiting Management
+
+### **Configuration**
+```bash
+# Add to .env file
+DAILY_RATE_LIMIT=100  # Default: 100 queries per user per day
+
+# For testing or cost control
+DAILY_RATE_LIMIT=50
+
+# To disable (not recommended for production)
+DAILY_RATE_LIMIT=0
+```
+
+### **Admin Commands**
+**System Overview**: Type `@nancy admin stats` or `@nancy rate stats` in any channel
+```
+📊 Rate Limit Statistics
+
+Daily Limit: 100 queries per user
+Active Users: 3
+
+User Breakdown:
+✅ <@U12345ABC>: 23/100 (23%)
+🟡 <@U67890DEF>: 78/100 (78%)  
+🚫 <@U54321GHI>: 100/100 (100%)
+
+Quotas reset at midnight UTC
+```
+
+**Status Indicators**:
+- ✅ Green: 0-69% usage (healthy)
+- 🟡 Yellow: 70-89% usage (moderate)
+- ⚠️ Orange: 90-99% usage (high)
+- 🚫 Red: 100% usage (quota exceeded)
+
+### **User Experience**
+**Personal Stats**: Users can check their own usage with:
+- `@nancy my quota`
+- `@nancy my stats` 
+- `@nancy usage`
+- Home page "📊 Check My Usage" button
+
+**When Quota Exceeded**:
+```
+🚫 Daily Limit Reached
+
+You've used your 100 daily Nancy interactions. 
+Your quota resets at midnight UTC.
+
+Need more access? Contact your administrator or try again tomorrow!
+```
+
+### **Admin Override Methods**
+
+#### **Method 1: Restart Nancy (Recommended)**
+```bash
+# Restarts Nancy and resets ALL user quotas instantly
+sudo systemctl restart nancy-bot
+# OR
+docker restart nancy-container
+# OR
+pkill -f nancy_bot.py && python nancy_bot.py
+```
+**When to use**: Urgent situations, server maintenance, or when multiple users need resets
+
+#### **Method 2: Adjust Daily Limit**
+```bash
+# Temporarily increase limit for everyone
+export DAILY_RATE_LIMIT=200
+# Restart Nancy to apply new limit
+```
+**When to use**: High-usage days, special events, or testing periods
+
+### **Monitoring and Logging**
+
+**Log Levels**:
+- `INFO`: Normal usage tracking
+- `WARNING`: Users approaching or hitting limits  
+- `ERROR`: Rate limiting system failures
+
+**Key Log Messages**:
+```bash
+# Normal operation
+✅ User U12345ABC rate limit check passed: 23/100 used
+
+# User getting low on quota
+⚠️ User U12345ABC has 5 queries remaining today
+
+# User hit limit
+🚫 Rate limit exceeded for user U12345ABC: 100/100
+
+# Last allowed query
+🟡 User U12345ABC has reached their daily limit: 100/100
+```
+
+### **Best Practices**
+
+1. **Start Conservative**: Begin with 50-100 queries per day
+2. **Monitor Patterns**: Watch logs for usage trends
+3. **Communication**: Inform users about limits upfront
+4. **Escalation Path**: Provide clear admin contact info
+5. **Regular Review**: Adjust limits based on actual usage
+
+### **Troubleshooting**
+
+**Problem**: User reports they can't ask questions
+- Check logs for rate limit messages
+- Verify user's quota with `@nancy admin stats`
+- If legitimate need, restart Nancy for immediate reset
+
+**Problem**: Rate limiting not working
+- Check if `DAILY_RATE_LIMIT` environment variable is set
+- Verify Nancy has write permissions for rate limit storage
+- Check logs for rate limiter initialization messages
+
+**Problem**: Usage stats showing incorrect data
+- Rate limits are stored in memory - restart clears all data
+- Quotas reset at midnight UTC (not user's local timezone)
+- Keep Cooking feature also counts against quota
+
 ## Git Strategy
 
 - Track only the embeddings database, source code, and configuration files.

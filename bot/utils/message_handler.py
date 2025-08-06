@@ -90,6 +90,16 @@ class MessageHandler:
                 # Clean the message text
                 clean_text = text.replace(f"<@{bot_user_id}>", "").strip()
                 
+                # Handle admin commands
+                if clean_text.lower() in ["rate stats", "quota stats", "admin stats"]:
+                    await self._handle_admin_rate_stats(channel, event.get("ts"))
+                    return
+                
+                # Handle personal stats commands
+                if clean_text.lower() in ["my stats", "my quota", "usage", "quota"]:
+                    await self._handle_personal_stats(channel, user, event.get("ts"))
+                    return
+                
                 # Create a callback for sending intermediate messages
                 async def send_message(text: str, thread_ts: str = None, is_final: bool = False):
                     if is_final:
@@ -168,14 +178,130 @@ class MessageHandler:
                     send_message, 
                     event.get("ts"),
                     conversation_history,
-                    thread_ts  # Pass thread_ts for context caching
+                    thread_ts,  # Pass thread_ts for context caching
+                    user  # Pass user_id for rate limiting
                 )
         except Exception as e:
             logger.error(f"Error in process_message: {e}")
     
+    async def _handle_admin_rate_stats(self, channel: str, thread_ts: str = None):
+        """Handle admin command to show rate limit statistics"""
+        try:
+            # Get rate limit stats
+            all_stats = self.llm_service.rate_limiter.get_all_stats()
+            
+            if all_stats["total_users"] == 0:
+                stats_text = (
+                    "📊 *Rate Limit Statistics*\n\n"
+                    f"Daily Limit: {all_stats['daily_limit']} queries per user\n"
+                    f"Active Users: 0\n\n"
+                    "_No users have made queries today._"
+                )
+            else:
+                stats_text = (
+                    "📊 *Rate Limit Statistics*\n\n"
+                    f"Daily Limit: {all_stats['daily_limit']} queries per user\n"
+                    f"Active Users: {all_stats['total_users']}\n\n"
+                    "*User Breakdown:*\n"
+                )
+                
+                for user_id, user_stats in all_stats["users"].items():
+                    used = user_stats["used_today"]
+                    remaining = user_stats["remaining"]
+                    percentage = (used / all_stats['daily_limit']) * 100
+                    
+                    # Get a visual indicator
+                    if percentage >= 100:
+                        indicator = "🚫"
+                    elif percentage >= 90:
+                        indicator = "⚠️"
+                    elif percentage >= 70:
+                        indicator = "🟡"
+                    else:
+                        indicator = "✅"
+                    
+                    stats_text += f"{indicator} <@{user_id}>: {used}/{all_stats['daily_limit']} ({percentage:.0f}%)\n"
+                
+                stats_text += f"\n_Quotas reset at midnight UTC_"
+            
+            await self.slack_client.send_message(
+                channel=channel,
+                text=stats_text,
+                thread_ts=thread_ts
+            )
+            
+        except Exception as e:
+            logger.error(f"Error handling admin rate stats: {e}")
+            await self.slack_client.send_message(
+                channel=channel,
+                text="❌ Error retrieving rate limit statistics.",
+                thread_ts=thread_ts
+            )
+    
+    async def _handle_personal_stats(self, channel: str, user_id: str, thread_ts: str = None):
+        """Handle user command to check their own rate limit statistics"""
+        try:
+            # Get user's personal stats
+            user_stats = self.llm_service.rate_limiter.get_user_stats(user_id)
+            
+            used = user_stats["used_today"]
+            daily_limit = user_stats["daily_limit"]
+            remaining = user_stats["remaining"]
+            percentage = (used / daily_limit) * 100 if daily_limit > 0 else 0
+            
+            # Get a visual indicator and status message
+            if percentage >= 100:
+                indicator = "🚫"
+                status = "Quota Exceeded"
+            elif percentage >= 90:
+                indicator = "⚠️"
+                status = "Almost Full"
+            elif percentage >= 70:
+                indicator = "🟡"
+                status = "Getting High"
+            else:
+                indicator = "✅"
+                status = "Looking Good"
+            
+            # Create a simple progress bar
+            filled = int((percentage / 100) * 10)
+            empty = 10 - filled
+            progress_bar = "█" * filled + "░" * empty
+            
+            stats_text = (
+                f"{indicator} *Your Nancy Usage Today*\n\n"
+                f"*Status:* {status}\n"
+                f"*Usage:* {used}/{daily_limit} queries ({percentage:.0f}%)\n"
+                f"*Remaining:* {remaining} queries\n\n"
+                f"*Progress:* `{progress_bar}` {percentage:.0f}%\n\n"
+                f"_Your quota resets at midnight UTC_"
+            )
+            
+            # Add helpful tips based on usage
+            if percentage >= 90:
+                stats_text += "\n\n💡 _Tip: You're running low! Consider saving complex questions for tomorrow._"
+            elif percentage >= 70:
+                stats_text += "\n\n💡 _Tip: You're using Nancy quite a bit today. Great questions!_"
+            elif percentage <= 10:
+                stats_text += "\n\n💡 _Tip: You have plenty of queries left. Feel free to ask detailed questions!_"
+            
+            await self.slack_client.send_message(
+                channel=channel,
+                text=stats_text,
+                thread_ts=thread_ts
+            )
+            
+        except Exception as e:
+            logger.error(f"Error handling personal stats: {e}")
+            await self.slack_client.send_message(
+                channel=channel,
+                text="❌ Error retrieving your usage statistics.",
+                thread_ts=thread_ts
+            )
+    
     async def generate_response_with_updates(self, query: str, send_callback: Callable, original_ts: str, 
                                            conversation_history: List[Dict[str, Any]] = None, 
-                                           thread_ts: str = None):
+                                           thread_ts: str = None, user_id: str = None):
         """Generate AI response with intermediate updates and conversation context"""
         try:
             # Format conversation context for the LLM
@@ -208,7 +334,8 @@ class MessageHandler:
                 full_query, 
                 sync_callback,
                 conversation_history,
-                thread_ts  # Pass thread_ts for context caching
+                thread_ts,  # Pass thread_ts for context caching
+                user_id  # Pass user_id for rate limiting
             )
             
             # Process messages from the queue as they arrive

@@ -129,7 +129,8 @@ class InteractiveHandler:
                     callback_fn=send_update,
                     conversation_history=conversation_history,
                     thread_ts=thread_ts,
-                    additional_turns=5  # Give Nancy 5 more turns to cook
+                    additional_turns=5,  # Give Nancy 5 more turns to cook
+                    user_id=user_id  # Pass user_id for rate limiting
                 )
                 
             else:
@@ -161,6 +162,8 @@ class InteractiveHandler:
                 await self.handle_view_articles(user_id, trigger_id)
             elif action_id == "btn_view_repos":
                 await self.handle_view_repos(user_id, trigger_id)
+            elif action_id == "btn_my_usage":
+                await self.handle_my_usage(payload)
             elif action_id == "btn_keep_cooking":
                 await self.handle_keep_cooking(payload)
             else:
@@ -304,3 +307,148 @@ class InteractiveHandler:
             
         except Exception as e:
             logger.error(f"Error in handle_view_repos: {e}")
+
+    async def handle_my_usage(self, payload: Dict[str, Any]):
+        """Handle 'Check My Usage' button click from home page"""
+        try:
+            user_id = payload["user"]["id"]
+            
+            if self.message_handler and hasattr(self.message_handler, 'llm_service'):
+                # Get user's personal stats
+                user_stats = self.message_handler.llm_service.rate_limiter.get_user_stats(user_id)
+                
+                used = user_stats["used_today"]
+                daily_limit = user_stats["daily_limit"]
+                remaining = user_stats["remaining"]
+                percentage = (used / daily_limit) * 100 if daily_limit > 0 else 0
+                
+                # Get status indicator
+                if percentage >= 100:
+                    indicator = "🚫"
+                    status = "Quota Exceeded"
+                elif percentage >= 90:
+                    indicator = "⚠️"
+                    status = "Almost Full"
+                elif percentage >= 70:
+                    indicator = "🟡"
+                    status = "Getting High"
+                else:
+                    indicator = "✅"
+                    status = "Looking Good"
+                
+                # Create modal with usage stats
+                modal = {
+                    "type": "modal",
+                    "title": {
+                        "type": "plain_text",
+                        "text": "📊 Your Usage Today"
+                    },
+                    "blocks": [
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": f"{indicator} *Status: {status}*"
+                            }
+                        },
+                        {
+                            "type": "section",
+                            "fields": [
+                                {
+                                    "type": "mrkdwn",
+                                    "text": f"*Used Today:*\n{used} queries"
+                                },
+                                {
+                                    "type": "mrkdwn",
+                                    "text": f"*Daily Limit:*\n{daily_limit} queries"
+                                },
+                                {
+                                    "type": "mrkdwn",
+                                    "text": f"*Remaining:*\n{remaining} queries"
+                                },
+                                {
+                                    "type": "mrkdwn",
+                                    "text": f"*Usage:*\n{percentage:.0f}%"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "context",
+                            "elements": [
+                                {
+                                    "type": "mrkdwn",
+                                    "text": "Your quota resets at midnight UTC each day."
+                                }
+                            ]
+                        }
+                    ]
+                }
+                
+                # Add tip based on usage
+                if percentage >= 90:
+                    tip_text = "💡 You're running low! Consider saving complex questions for tomorrow."
+                elif percentage >= 70:
+                    tip_text = "💡 You're using Nancy quite a bit today. Great questions!"
+                else:
+                    tip_text = "💡 You have plenty of queries left. Feel free to ask detailed questions!"
+                
+                modal["blocks"].append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": tip_text
+                    }
+                })
+                
+                await self.slack_client.views_open(
+                    trigger_id=payload["trigger_id"],
+                    view=modal
+                )
+                
+            else:
+                # Fallback if no message handler is connected
+                await self.slack_client.views_open(
+                    trigger_id=payload["trigger_id"],
+                    view={
+                        "type": "modal",
+                        "title": {
+                            "type": "plain_text",
+                            "text": "Usage Stats"
+                        },
+                        "blocks": [
+                            {
+                                "type": "section",
+                                "text": {
+                                    "type": "mrkdwn",
+                                    "text": "❌ *Usage tracking not available*\n\nTry typing `@nancy my quota` in any channel instead."
+                                }
+                            }
+                        ]
+                    }
+                )
+                
+        except Exception as e:
+            logger.error(f"Error handling my usage: {e}")
+            # Send error modal
+            try:
+                await self.slack_client.views_open(
+                    trigger_id=payload["trigger_id"],
+                    view={
+                        "type": "modal",
+                        "title": {
+                            "type": "plain_text",
+                            "text": "Error"
+                        },
+                        "blocks": [
+                            {
+                                "type": "section",
+                                "text": {
+                                    "type": "mrkdwn",
+                                    "text": "❌ *Error retrieving usage stats*\n\nTry typing `@nancy my quota` in any channel instead."
+                                }
+                            }
+                        ]
+                    }
+                )
+            except Exception:
+                pass  # Best effort

@@ -19,6 +19,7 @@ load_dotenv(env_path)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL")
 DEBUG_LLM = os.environ.get("DEBUG_LLM", "False").lower() in ("true", "1", "yes")
+DAILY_RATE_LIMIT = int(os.environ.get("DAILY_RATE_LIMIT", "100"))  # Default 100 queries per user per day
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 headers = {"Content-Type": "application/json"}
 
@@ -30,7 +31,8 @@ class LLMService:
             model_weights_path: Path = None,
             debugging: bool = None,  # Use None to read from env
             no_of_retrievals: int = 5,
-            rag_service=None  # Accept existing RAG service
+            rag_service=None,  # Accept existing RAG service
+            daily_rate_limit: int = None  # Daily queries per user (None = use env var)
         ):
         # Use Nancy's base directory for all paths
         nancy_base = Path(os.environ.get("NANCY_BASE_DIR", "."))
@@ -40,6 +42,10 @@ class LLMService:
             system_prompt = nancy_base / "bot/plugins/llm/system_prompt.txt"
         if model_weights_path is None:
             model_weights_path = nancy_base / "config" / "model_weights.yaml"
+        
+        # Set rate limit from environment if not specified
+        if daily_rate_limit is None:
+            daily_rate_limit = DAILY_RATE_LIMIT
         
         # Set debugging from environment if not specified
         if debugging is None:
@@ -57,10 +63,15 @@ class LLMService:
         with open(self.system_prompt_path, 'r') as f:
             self.system_prompt = f.read()
 
+        # Initialize rate limiter
+        from bot.utils.rate_limiter import DailyRateLimiter
+        self.rate_limiter = DailyRateLimiter(daily_limit=daily_rate_limit)
+
         # Log debugging state
         import logging
         logger = logging.getLogger(__name__)
         logger.info(f"LLM Service initialized with debugging={'ON' if self.debugging else 'OFF'}")
+        logger.info(f"Daily rate limit set to: {daily_rate_limit} queries per user")
 
         # RAG variables - use provided service or create new one
         if rag_service is not None:
@@ -227,9 +238,32 @@ class LLMService:
 
         return payload
 
-    def querry_llm(self, payload: dict, turn: int) -> tuple[str, str]:
+    def querry_llm(self, payload: dict, turn: int, user_id: str = None) -> tuple[str, str]:
         import logging
         logger = logging.getLogger(__name__)
+        
+        # Rate limiting check (only on first turn to avoid multiple charges per conversation)
+        if turn == 0 and user_id:
+            allowed, used_today, remaining = self.rate_limiter.check_and_increment(user_id)
+            
+            if not allowed:
+                logger.warning(f"Rate limit exceeded for user {user_id}: {used_today} queries used today")
+                # Return a rate limit message instead of calling the API
+                rate_limit_msg = (
+                    f"🚫 *Daily Limit Reached*\n\n"
+                    f"You've used your {used_today} daily Nancy interactions. "
+                    f"Your quota resets at midnight UTC.\n\n"
+                    f"Need more access? Contact your administrator or try again tomorrow!"
+                )
+                return rate_limit_msg, f"\n\nTURN {turn+1}:\n\n{rate_limit_msg}\n"
+            
+            # Log successful rate limit check
+            if remaining == 0:  # This was the last allowed query
+                logger.warning(f"🟡 User {user_id} has reached their daily limit: {used_today}/{used_today + remaining}")
+            elif remaining <= 10:  # Warning when getting low
+                logger.info(f"⚠️ User {user_id} has {remaining} queries remaining today")
+            else:
+                logger.info(f"✅ User {user_id} rate limit check passed: {used_today}/{used_today + remaining} used")
         
         try:
             logger.info(f"Making Gemini API request for turn {turn}")
@@ -271,7 +305,7 @@ class LLMService:
             logger.error(f"Exception in querry_llm: {e}")
             return None, None
 
-    def continue_with_extended_turns(self, callback_fn, conversation_history: list = None, thread_ts: str = None, additional_turns: int = 5):
+    def continue_with_extended_turns(self, callback_fn, conversation_history: list = None, thread_ts: str = None, additional_turns: int = 5, user_id: str = None):
         """
         Continue an existing conversation with extended turns (for "Keep Cooking" feature).
         
@@ -280,6 +314,7 @@ class LLMService:
             conversation_history: Previous conversation context
             thread_ts: Thread timestamp for context
             additional_turns: How many additional turns to allow (default 5)
+            user_id: Slack user ID for rate limiting
         """
         import logging
         logger = logging.getLogger(__name__)
@@ -299,7 +334,8 @@ class LLMService:
                 query=continuation_query,
                 callback_fn=callback_fn,
                 conversation_history=conversation_history,
-                thread_ts=thread_ts
+                thread_ts=thread_ts,
+                user_id=user_id
             )
             
             return result
@@ -308,12 +344,13 @@ class LLMService:
             # Restore original max turns
             self.max_turns = original_max_turns
 
-    def call_llm_with_callback(self, query: str, callback_fn, conversation_history: list = None, thread_ts: str = None):
+    def call_llm_with_callback(self, query: str, callback_fn, conversation_history: list = None, thread_ts: str = None, user_id: str = None):
         """
         Process a query with a callback function for sending intermediate updates.
         callback_fn(message: str, is_final: bool = False)
         conversation_history: list of recent messages for context
         thread_ts: Slack thread timestamp for context caching
+        user_id: Slack user ID for rate limiting
         """
         import logging
         logger = logging.getLogger(__name__)
@@ -354,12 +391,18 @@ class LLMService:
             logger.info(f"Starting LLM turn {turn}")
 
             # --- QUERY LLM ---
-            llm_text, assistant_response = self.querry_llm(payload, turn)
+            llm_text, assistant_response = self.querry_llm(payload, turn, user_id)
 
             if llm_text is None:
                 logger.error("LLM returned None - stopping")
                 searching = False  # exit the loop
                 callback_fn("  :x: _Failed to connect to Gemini API_", True)
+                return
+            
+            # Check if this is a rate limit response
+            if "🚫 *Daily Limit Reached*" in llm_text:
+                logger.info("Rate limit response detected - stopping processing")
+                callback_fn(llm_text, True)  # Send rate limit message as final response
                 return
             # --- END QUERY LLM ---
 
@@ -520,12 +563,13 @@ class LLMService:
             # Prune old threads (keep only 50 most recent)
             self._prune_thread_cache()
 
-    def call_llm(self, query: str, conversation_history: list = None, thread_ts: str = None) -> str:
+    def call_llm(self, query: str, conversation_history: list = None, thread_ts: str = None, user_id: str = None) -> str:
         """
         Process a query and return the final response.
         Collects all intermediate responses and returns the final compiled answer.
         conversation_history: list of recent messages for context
         thread_ts: Slack thread timestamp for context caching
+        user_id: Slack user ID for rate limiting
         """
         # Initialize the turn variables
         payload = None
@@ -545,11 +589,15 @@ class LLMService:
         while searching and turn < self.max_turns:
 
             # --- QUERY LLM ---
-            llm_text, assistant_response = self.querry_llm(payload, turn)
+            llm_text, assistant_response = self.querry_llm(payload, turn, user_id)
 
             if llm_text is None:
                 searching = False  # exit the loop
                 raise Exception("LLM returned None")
+            
+            # Check if this is a rate limit response
+            if "🚫 *Daily Limit Reached*" in llm_text:
+                return llm_text  # Return rate limit message directly
             # --- END QUERY LLM ---
 
             # Begin new turn in the meta prompt

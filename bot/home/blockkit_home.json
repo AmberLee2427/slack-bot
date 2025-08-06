@@ -24,7 +24,42 @@
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "*Explore My Knowledge Base*"
+        "text": "*📊 Daily Usage Limits*\n\nTo ensure fair access for everyone, you have a daily quota of questions. Check your usage anytime!"
+      }
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "📊 Check My Usage",
+            "emoji": true
+          },
+          "value": "my usage",
+          "action_id": "btn_my_usage",
+          "style": "primary"
+        }
+      ]
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "💡 *Usage Tips:* • Type `@nancy my quota` in any channel • Quotas reset at midnight UTC • Use 🍳 Keep Cooking for deeper analysis • Contact admin if you need more queries"
+        }
+      ]
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*🔍 Explore My Knowledge Base*"
       }
     },
     {
@@ -61,6 +96,16 @@
           "action_id": "btn_view_repos"
 				}
 			]
-		}
+		},
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*🚀 Quick Commands*\n\n• `@nancy my quota` - Check your daily usage\n• `@nancy help` - Get general assistance\n• 🍳 *Keep Cooking* button - Get deeper analysis when I finish a response\n• Just ask questions naturally - I'll search my knowledge base automatically!"
+      }
+    }
   ]
 }
