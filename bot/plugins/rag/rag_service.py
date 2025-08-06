@@ -30,7 +30,7 @@ class RAGService:
         self.repo_config = None
         self._load_config()
         self._load_embeddings()
-        self.model_weights_path = Path(embeddings_path).parent / "model_weights.yaml"
+        self.model_weights_path = Path(os.environ.get("NANCY_BASE_DIR", ".")) / "config" / "model_weights.yaml"
         self.model_weights = self._load_model_weights()
         self.extension_weights = self._load_extension_weights()
     

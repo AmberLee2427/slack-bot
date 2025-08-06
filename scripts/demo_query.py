@@ -151,7 +151,7 @@ GEMINI_MODEL = "gemini-1.5-pro"
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 headers = {"Content-Type": "application/json"}
 
-model_weights_path = Path("knowledge_base/embeddings/model_weights.yaml")
+model_weights_path = Path("config/model_weights.yaml")
 # Load model weights
 if model_weights_path.exists():
     with open(model_weights_path, "r") as f:
