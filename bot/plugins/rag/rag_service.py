@@ -364,11 +364,11 @@ class RAGService:
             # Truncate text if needed (allow more content per document)
             text = result['text']
             
-            # Add document info with GitHub link instead of plain filename
+            # Add document info with both source path and GitHub link
             if github_url:
                 # Extract filename for link text
                 filename = result['id'].split('/')[-1]
-                doc_info = f"Source: <{github_url}|{filename}>\n"
+                doc_info = f"Source: {result['id']}\nGitHub URL: <{github_url}|{filename}>\n"
             else:
                 doc_info = f"Source: {result['id']}\n"
             
@@ -440,11 +440,11 @@ class RAGService:
             # Allow much more content per document
             text = result['text']
             
-            # Add document info with GitHub link instead of plain filename
+            # Add document info with both source path and GitHub link
             if github_url:
                 # Extract filename for link text
                 filename = result['id'].split('/')[-1]
-                doc_info = f"Source: <{github_url}|{filename}>\n"
+                doc_info = f"Source: {result['id']}\nGitHub URL: <{github_url}|{filename}>\n"
             else:
                 doc_info = f"Source: {result['id']}\n"
             

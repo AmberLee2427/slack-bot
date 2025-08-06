@@ -158,8 +158,22 @@ GitHub Pages sites           Direct text (code/docs)          Semantic search
 4. **Create configuration**
    Edit/Create `bot/config/.env`:
    ```python
-   SLACK_BOT_TOKEN = "xoxb-your-bot-token"
-   PLUGINS = ["bot.plugins.llm", "bot.plugins.rag"]
+   # LLM Configuration
+   GEMINI_API_KEY = "your-api-key""
+   GEMINI_MODEL = "gemini-2.0-flash-lite"
+
+   # Nancy Bot Configuration
+   SLACK_BOT_TOKEN="xoxb-your-bot-token"
+   SLACK_SIGNING_SECRET="your-signing-secret"
+
+   # Logging
+   LOG_LEVEL=INFO
+   DEBUG_LLM=False
+
+   # Knowledge Base
+   KNOWLEDGE_BASE_PATH=knowledge_base/embeddings
+   USE_DUAL_EMBEDDING=true
+   CODE_EMBEDDING_MODEL=microsoft/codebert-base
    ```
 
 5. **Build the knowledge base**
