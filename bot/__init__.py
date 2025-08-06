@@ -1,0 +1,3 @@
+"""
+Bot package for Nancy
+"""
