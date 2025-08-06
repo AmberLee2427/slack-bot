@@ -271,6 +271,43 @@ class LLMService:
             logger.error(f"Exception in querry_llm: {e}")
             return None, None
 
+    def continue_with_extended_turns(self, callback_fn, conversation_history: list = None, thread_ts: str = None, additional_turns: int = 5):
+        """
+        Continue an existing conversation with extended turns (for "Keep Cooking" feature).
+        
+        Args:
+            callback_fn: Function to call with intermediate updates
+            conversation_history: Previous conversation context
+            thread_ts: Thread timestamp for context
+            additional_turns: How many additional turns to allow (default 5)
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"🍳 Keep Cooking: Extending analysis with {additional_turns} additional turns")
+        
+        # Temporarily increase max turns for this session
+        original_max_turns = self.max_turns
+        self.max_turns = original_max_turns + additional_turns
+        
+        try:
+            # Create a continuation prompt
+            continuation_query = "Please continue your analysis and provide additional insights, examples, or deeper explanation on this topic."
+            
+            # Use the regular callback method but with extended turns
+            result = self.call_llm_with_callback(
+                query=continuation_query,
+                callback_fn=callback_fn,
+                conversation_history=conversation_history,
+                thread_ts=thread_ts
+            )
+            
+            return result
+            
+        finally:
+            # Restore original max turns
+            self.max_turns = original_max_turns
+
     def call_llm_with_callback(self, query: str, callback_fn, conversation_history: list = None, thread_ts: str = None):
         """
         Process a query with a callback function for sending intermediate updates.

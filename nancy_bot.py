@@ -46,7 +46,11 @@ class NancyBot:
             self.conversation_manager, 
             self.llm_service
         )
-        self.interactive_handler = InteractiveHandler(self.slack_client, self.base_dir)
+        self.interactive_handler = InteractiveHandler(
+            self.slack_client, 
+            self.base_dir, 
+            self.message_handler
+        )
         
     async def handle_event(self, request: web.Request) -> web.Response:
         """Handle Slack events via HTTP"""

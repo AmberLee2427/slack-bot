@@ -93,10 +93,37 @@ class MessageHandler:
                 # Create a callback for sending intermediate messages
                 async def send_message(text: str, thread_ts: str = None, is_final: bool = False):
                     if is_final:
-                        # Send final response as a regular message
+                        # Send final response with "Keep Cooking" button
+                        blocks = [
+                            {
+                                "type": "section",
+                                "text": {
+                                    "type": "mrkdwn",
+                                    "text": text
+                                }
+                            },
+                            {
+                                "type": "actions",
+                                "elements": [
+                                    {
+                                        "type": "button",
+                                        "text": {
+                                            "type": "plain_text",
+                                            "text": "🍳 Keep Cooking",
+                                            "emoji": True
+                                        },
+                                        "value": "keep_cooking",
+                                        "action_id": "btn_keep_cooking",
+                                        "style": "primary"
+                                    }
+                                ]
+                            }
+                        ]
+                        
                         await self.slack_client.send_message(
                             channel=channel,
-                            text=text,
+                            text=text,  # Fallback text for notifications
+                            blocks=blocks,
                             thread_ts=thread_ts or event.get("ts")
                         )
                     else:

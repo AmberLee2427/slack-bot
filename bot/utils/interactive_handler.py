@@ -12,9 +12,10 @@ logger = logging.getLogger(__name__)
 class InteractiveHandler:
     """Handles Slack interactive components (buttons, modals, etc.)"""
     
-    def __init__(self, slack_client, base_dir: Path):
+    def __init__(self, slack_client, base_dir: Path, message_handler=None):
         self.slack_client = slack_client
         self.base_dir = base_dir
+        self.message_handler = message_handler
     
     async def handle_home_opened(self, event: Dict[str, Any]):
         """Handle when user opens Nancy's Home tab"""
@@ -38,7 +39,111 @@ class InteractiveHandler:
                 logger.error(f"Home page template not found at {home_path}")
                 
         except Exception as e:
-            logger.error(f"Error handling home opened: {e}")
+            logger.error(f"Error handling view repos: {e}")
+
+    async def handle_keep_cooking(self, payload: Dict[str, Any]):
+        """Handle 'Keep Cooking' button click - continue/expand Nancy's analysis with extended turns"""
+        try:
+            user_id = payload["user"]["id"]
+            channel_id = payload["channel"]["id"]
+            message = payload["message"]
+            
+            # Extract the original message text and context
+            thread_ts = message.get("thread_ts") or message.get("ts")
+            
+            # Send acknowledgment that we're cooking more
+            await self.slack_client.send_message(
+                channel=channel_id,
+                text="🍳 *Keep cooking activated!* Giving Nancy 5 more turns to expand her analysis...",
+                thread_ts=thread_ts
+            )
+            
+            # If we have a message handler, trigger expanded analysis with extended turns
+            if self.message_handler:
+                # Get conversation history for context
+                conversation_history = []
+                if hasattr(self.message_handler, 'conversation_manager'):
+                    conversation_history = await self.message_handler.conversation_manager.get_conversation_context(
+                        channel_id, thread_ts, max_messages=10
+                    )
+                
+                # Create callback for sending updates
+                async def send_update(text: str, is_final: bool = False):
+                    if is_final:
+                        # Send final expanded response with another Keep Cooking button
+                        blocks = [
+                            {
+                                "type": "section",
+                                "text": {
+                                    "type": "mrkdwn",
+                                    "text": text
+                                }
+                            },
+                            {
+                                "type": "actions",
+                                "elements": [
+                                    {
+                                        "type": "button",
+                                        "text": {
+                                            "type": "plain_text",
+                                            "text": "🍳 Keep Cooking",
+                                            "emoji": True
+                                        },
+                                        "value": "keep_cooking",
+                                        "action_id": "btn_keep_cooking",
+                                        "style": "primary"
+                                    }
+                                ]
+                            }
+                        ]
+                        
+                        await self.slack_client.send_message(
+                            channel=channel_id,
+                            text=text,
+                            blocks=blocks,
+                            thread_ts=thread_ts
+                        )
+                    else:
+                        # Send intermediate status updates
+                        blocks = [
+                            {
+                                "type": "context",
+                                "elements": [
+                                    {
+                                        "type": "mrkdwn",
+                                        "text": f"ℹ️ {text}"
+                                    }
+                                ]
+                            }
+                        ]
+                        await self.slack_client.send_message(
+                            channel=channel_id,
+                            text=text,
+                            blocks=blocks,
+                            thread_ts=thread_ts
+                        )
+                
+                # Use the LLM service's new continue method with extended turns
+                llm_service = self.message_handler.llm_service
+                await llm_service.continue_with_extended_turns(
+                    callback_fn=send_update,
+                    conversation_history=conversation_history,
+                    thread_ts=thread_ts,
+                    additional_turns=5  # Give Nancy 5 more turns to cook
+                )
+                
+            else:
+                # Fallback if no message handler is connected
+                await self.slack_client.send_message(
+                    channel=channel_id,
+                    text="I'd love to keep cooking, but my expansion capabilities aren't connected yet! 🔧",
+                    thread_ts=thread_ts
+                )
+            
+            logger.info(f"Keep cooking with extended turns requested by user {user_id} for message in channel {channel_id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling keep cooking: {e}")
 
     async def handle_interactive_payload(self, payload: Dict[str, Any]):
         """Handle interactive components (buttons, etc.)"""
@@ -56,6 +161,8 @@ class InteractiveHandler:
                 await self.handle_view_articles(user_id, trigger_id)
             elif action_id == "btn_view_repos":
                 await self.handle_view_repos(user_id, trigger_id)
+            elif action_id == "btn_keep_cooking":
+                await self.handle_keep_cooking(payload)
             else:
                 logger.warning(f"Unknown action_id: {action_id}")
 
