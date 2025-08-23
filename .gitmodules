@@ -1,3 +1,6 @@
 [submodule "src/nb4llm"]
 	path = src/nb4llm
 	url = ./src/nb4llm
+[submodule "src/nancy-brain"]
+	path = src/nancy-brain
+	url = https://github.com/AmberLee2427/nancy-brain.git
