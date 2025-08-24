@@ -1,0 +1,27 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Nancy Brain: Test Environment",
+			"type": "shell",
+			"command": "conda",
+			"args": [
+				"run",
+				"-n",
+				"roman-slack-bot",
+				"python",
+				"-c",
+				"import txtai, fastapi, pydantic; print('✅ All packages available!'); print('txtai:', txtai.__version__); print('fastapi:', fastapi.__version__); print('pydantic:', pydantic.__version__)"
+			],
+			"group": "test",
+			"presentation": {
+				"reveal": "always",
+				"panel": "new"
+			},
+			"options": {
+				"cwd": "${workspaceFolder}/src/nancy-brain"
+			},
+			"problemMatcher": []
+		}
+	]
+}

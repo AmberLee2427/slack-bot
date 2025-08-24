@@ -44,10 +44,10 @@ def test_pipe_real_run(dirty=False):
 
     # Clean up after test (only if not dirty)
     if not dirty:
-    print("Cleaning up test output...")
-    shutil.rmtree(raw_repo)
+        print("Cleaning up test output...")
+        shutil.rmtree(raw_repo)
         shutil.rmtree(embeddings_dir)
-    print("Test completed successfully.")
+        print("Test completed successfully.")
     else:
         print("Keeping embeddings for further testing (--dirty flag used)")
         print(f"Embeddings available at: {embeddings_dir}")

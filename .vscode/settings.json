@@ -1,0 +1,16 @@
+{
+    "python.defaultInterpreter": "/opt/anaconda3/envs/roman-slack-bot/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "terminal.integrated.env.osx": {
+        "CONDA_DEFAULT_ENV": "roman-slack-bot",
+        "KMP_DUPLICATE_LIB_OK": "TRUE"
+    },
+    "terminal.integrated.profiles.osx": {
+        "Roman Slack Bot (conda)": {
+            "path": "/opt/anaconda3/bin/conda",
+            "args": ["run", "-n", "roman-slack-bot", "/bin/zsh"]
+        }
+    },
+    "terminal.integrated.defaultProfile.osx": "Roman Slack Bot (conda)"
+}
