@@ -151,5 +151,7 @@ bot/config/*
 bot/config/.env
 config/model_weights.yaml  # Dynamic learning weights from Nancy's WEIGHT: tool
 .env
+# VSCode workspace
+*.code-workspace
 
 SLACK.md
