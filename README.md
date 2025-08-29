@@ -70,8 +70,8 @@ PDF articles                 Apache Tika (PDFs)                    ↓
 GitHub Pages sites           Direct text (code/docs)          Semantic search
 ```
 1. **Raw Stage**: Git repositories, downloaded PDFs, documentation sites
-2. **Processing Stage**: Format-specific conversion (nb4llm, Tika, direct text)
-3. **Embeddings Stage**: Unified txtai vector database for fast semantic search
+2. **Processing Stage**: (Knowledge base building is maintained outside this bot repository.)
+3. **Embeddings Stage**: See the external knowledge-base project for embedding pipelines and index creation.
 
 ## 🛠️ Setup & Installation
 

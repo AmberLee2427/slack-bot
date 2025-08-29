@@ -67,6 +67,9 @@ slack-bot/
 ├── .gitignore                   # Git ignore rules (includes knowledge_base/raw)
 └── AGENTS.md                    # This file - AI agent guide
 ```
+----------------------------------------------------------
+Moved to nancy-brain
+----------------------------------------------------------
 
 ## Data Pipeline (v0.2)
 
@@ -115,7 +118,10 @@ slack-bot/
 - **Apache Tika** (via tika package): PDF text extraction for journal articles
 - **Unified pipeline**: Single build process handles repositories + PDFs + notebooks
 
-## Current Status and Next Steps
+----------------------------------------------------------
+----------------------------------------------------------
+
+## Previous State
 
 ### ✅ **Fully Implemented (v0.3)**
 - **Dual Embedding System**: General + code models with intelligent merging
@@ -143,31 +149,12 @@ slack-bot/
 - **Timeline**: 3-4 hours
 
 ### 🔧 **Technical Debt and Optimizations**
-- **Pipeline Modularization**: Refactor scripts into importable package
+
+> Now issues for the Nancy Brain package
+
+- ✅ **Pipeline Modularization**: Refactor scripts into importable package
 - **Embedding Model Updates**: Evaluate newer models for improved retrieval
 - **Chunking Strategy**: Consider document vs. chunk-level embeddings for very large files
-
-## Development Workflow (v3.0)
-
-1. **Configure sources** in `config/repositories.yml` and `config/articles.yml`
-2. **Build knowledge base**: `python scripts/build_knowledge_base.py --category microlens_submit --dirty`
-   - Clones/updates repositories  
-   - Downloads PDF articles from URLs
-   - Converts notebooks via nb4llm (with .nb.txt extension)
-   - Extracts PDF text via Tika
-   - Creates dual txtai embedding indices (general + code models)
-   - Comprehensive failure tracking and pipeline summary
-3. **Test queries**: `python scripts/demo_query.py "your question here"`
-4. **Deploy bot**: Configure Slack tokens, set dual embedding environment variables, and run Nancy
-
-## Technical Considerations (v3.0)
-
-- **Dual Embedding Models**: Complementary general and code-specific models for comprehensive coverage
-- **File Type Intelligence**: Automatic categorization drives optimal model weighting
-- **Large Candidate Pools**: 50x search limits enable effective reweighting without compromising accuracy
-- **GitHub Integration**: Direct source links enhance user experience and source verification
-- **Environment-Driven**: All features controllable via environment variables for deployment flexibility
-- **Performance Optimized**: Nancy is "super fast" - large candidate pools don't impact user experience
 
 ## Admin Guide: Rate Limiting Management
 
@@ -292,8 +279,7 @@ export DAILY_RATE_LIMIT=200
 
 ## Git Strategy
 
-- Track only the embeddings database config, source code, and configuration files.
-- Ignore raw data, indexed embeddings, local settings, and model caches.
+- KB stuff belongs in the Nancy Brain package.
 
 ## Important Notes
 
@@ -303,9 +289,7 @@ export DAILY_RATE_LIMIT=200
 
 ---
 
-This guide reflects the current state of the project as of the latest development cycle. See README.md for user-facing details and scripts/demo_query.py for the latest RAG/LLM workflow. 
-
-## MCP Adapter Refactor Plan
+## MCP Adapter Refactor Plan (v0.5)
 
 Purpose
 -------
@@ -317,8 +301,7 @@ Quick checklist (hand-off friendly)
 - [x] Wire `bot/plugins/llm/llm_service.py` to instantiate `MCPRAGAdapter` when `MCP_BASE_URL` is present
 - [ ] Add unit tests: `tests/test_mcp_adapter.py` (mock MCP responses)
 - [ ] Add integration/smoke test gated by env var `MCP_INTEGRATION_TEST=true`
-- [ ] Add `.env` keys to `bot/config/.env.example`: `MCP_BASE_URL`, `MCP_API_KEY`
-- [ ] Stage rollout: enable MCP usage with env flag; keep fallback to local `RAGService`
+- [x] Add `.env` keys to `bot/config/.env.example`: `MCP_BASE_URL`, `MCP_API_KEY`
 
 Additional immediate work (v0.5 - health/status & tests)
 -----------------------------------------------
