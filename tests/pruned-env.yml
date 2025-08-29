@@ -1,0 +1,23 @@
+name: roman-slack-bot-pruned
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - aiohttp>=3.8.0
+      - slack-sdk>=3.18.0
+      - slack-bolt>=1.18.0
+      - python-dotenv>=1.0.0
+      - pyyaml>=5.3
+      - requests>=2.28.0
+      - regex>=2022.8.17
+      - pytest>=7.0.0
+      - pytest-asyncio>=0.21.0
+      - pytest-aiohttp>=1.1.0
+      - black>=23.0.0
+      - flake8>=6.0.0
+
+# This pruned env purposefully omits heavy ML packages like torch, faiss, transformers, and txtai
+# If you need full ML capabilities, use `tests/test-env.yml` instead.

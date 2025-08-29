@@ -10,6 +10,7 @@ import urllib.parse
 from pathlib import Path
 from typing import Dict, Any
 from aiohttp import web
+import requests
 
 # Fix OpenMP issue before importing any ML libraries
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -18,7 +19,6 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 NANCY_BASE_DIR = Path(__file__).parent.absolute()
 os.environ["NANCY_BASE_DIR"] = str(NANCY_BASE_DIR)
 
-from bot.plugins.rag.rag_service import RAGService
 from bot.plugins.llm.llm_service import LLMService
 from bot.utils import SlackClient, MessageHandler, InteractiveHandler, ConversationManager
 
@@ -28,28 +28,25 @@ class NancyBot:
     def __init__(self):
         # Initialize core components
         self.base_dir = NANCY_BASE_DIR
-        
+
         # Initialize Slack client
         self.slack_client = SlackClient(self.base_dir)
-        
-        # Initialize AI services
-        self.rag_service = RAGService(
-            embeddings_path="knowledge_base/embeddings/index", 
-            config_path="config/repositories.yml"
-        )
-        self.llm_service = LLMService(rag_service=self.rag_service, debugging=True)
-        
+
+        # Initialize AI services (do NOT instantiate heavy in-process RAG here)
+        # LLMService will prefer an MCP adapter when MCP_BASE_URL is set, or accept an injected rag_service.
+        self.llm_service = LLMService(rag_service=None, debugging=True)
+
         # Initialize handlers
         self.conversation_manager = ConversationManager(self.slack_client)
         self.message_handler = MessageHandler(
-            self.slack_client, 
-            self.conversation_manager, 
-            self.llm_service
+            self.slack_client,
+            self.conversation_manager,
+            self.llm_service,
         )
         self.interactive_handler = InteractiveHandler(
-            self.slack_client, 
-            self.base_dir, 
-            self.message_handler
+            self.slack_client,
+            self.base_dir,
+            self.message_handler,
         )
         
     async def handle_event(self, request: web.Request) -> web.Response:
@@ -120,6 +117,102 @@ class NancyBot:
         except Exception as e:
             logger.error(f"Error handling interactive component: {e}")
             return web.Response(status=500)
+
+    async def handle_command(self, request: web.Request) -> web.Response:
+        """Handle Slack slash commands (e.g., /status)"""
+        body = await request.text()
+        try:
+            parsed = urllib.parse.parse_qs(body)
+            command = parsed.get('command', [''])[0]
+            text = parsed.get('text', [''])[0].strip()
+            user_id = parsed.get('user_id', [''])[0]
+
+            logger.info(f"Slash command received: {command} text={text} user={user_id}")
+
+            # Only implement /status for now
+            if command == '/status' or command == '/health':
+                # If user asked to reconnect, attempt a hot-reconnect
+                if text.lower() == 'reconnect':
+                    ok, status = self._attempt_reconnect()
+                    if ok:
+                        resp_text = f"✅ RAG reconnected: {status}"
+                    else:
+                        resp_text = f"⚠️ Reconnect failed: {status}"
+                else:
+                    # Report current LLMService.rag_status if available
+                    rag_status = getattr(self.llm_service, 'rag_status', None)
+                    if rag_status:
+                        if rag_status.get('available'):
+                            resp_text = f"✅ RAG available (source: {rag_status.get('source')})"
+                            # include extra details when present
+                            details = {k: v for k, v in rag_status.items() if k not in ('available','source')}
+                            if details:
+                                resp_text += f"\nDetails: {details}"
+                        else:
+                            resp_text = f"⚠️ RAG unavailable (source: {rag_status.get('source')})"
+                            if 'reason' in rag_status:
+                                resp_text += f"\nReason: {rag_status.get('reason')}"
+                    else:
+                        resp_text = "⚠️ No RAG status available"
+
+                payload = {
+                    "response_type": "ephemeral",
+                    "text": resp_text
+                }
+                return web.json_response(payload)
+
+            # Unknown command
+            return web.Response(status=404, text="Unknown command")
+
+        except Exception as e:
+            logger.error(f"Error handling slash command: {e}")
+            return web.Response(status=500)
+
+    def _attempt_reconnect(self) -> tuple[bool, str]:
+        """Try to (re)connect the LLMService to an MCP-backed RAG adapter.
+
+        Returns (ok, status_message)
+        """
+        try:
+            MCP_BASE_URL = os.environ.get('MCP_BASE_URL')
+            MCP_API_KEY = os.environ.get('MCP_API_KEY')
+            if not MCP_BASE_URL:
+                # Clear any existing rag and report
+                self.llm_service.rag = None
+                self.llm_service.rag_status = {"available": False, "source": "none", "reason": "MCP_BASE_URL not set"}
+                return False, "MCP_BASE_URL not set"
+
+            from bot.plugins.rag.mcp_adapter import MCPRAGAdapter
+
+            adapter = MCPRAGAdapter(MCP_BASE_URL, api_key=MCP_API_KEY)
+            health_url = MCP_BASE_URL.rstrip('/') + '/health'
+            headers = {}
+            if MCP_API_KEY:
+                headers['Authorization'] = f'Bearer {MCP_API_KEY}'
+            resp = requests.get(health_url, headers=headers, timeout=5)
+            if not resp.ok:
+                self.llm_service.rag = None
+                self.llm_service.rag_status = {"available": False, "source": "mcp", "reason": f"health {resp.status_code}"}
+                return False, f"health {resp.status_code}"
+
+            # Success
+            self.llm_service.rag = adapter
+            self.llm_service.rag_status = {"available": True, "source": "mcp"}
+            try:
+                self.llm_service.update_rag_variables()
+            except Exception:
+                # Best-effort; don't fail reconnect if variable update hiccups
+                pass
+            return True, "connected via MCP"
+
+        except Exception as e:
+            # Ensure LLMService is left in degraded state
+            try:
+                self.llm_service.rag = None
+                self.llm_service.rag_status = {"available": False, "source": "mcp", "reason": str(e)}
+            except Exception:
+                pass
+            return False, str(e)
     
 async def create_app() -> web.Application:
     """Create the web application"""
@@ -128,6 +221,7 @@ async def create_app() -> web.Application:
     
     app.router.add_post("/slack/events", bot.handle_event)
     app.router.add_post("/slack/interactive", bot.handle_interactive)
+    app.router.add_post("/slack/commands", bot.handle_command)
     
     return app
 

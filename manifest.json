@@ -16,6 +16,14 @@
             "always_online": true
         }
     },
+       "slash_commands": [
+           {
+               "command": "/status",
+               "url": "https://your-host.example.com/slack/commands",
+               "description": "Show RAG / MCP health and optionally reconnect (usage: /status reconnect)",
+               "usage_hint": "[reconnect]"
+           }
+       ],
     "oauth_config": {
         "scopes": {
             "bot": [

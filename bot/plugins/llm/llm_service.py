@@ -9,7 +9,6 @@ import requests
 import json
 import re
 import difflib
-from rag_core.service import RAGService
 from dotenv import load_dotenv
 
 # environment file 
@@ -75,7 +74,9 @@ class LLMService:
 
         # RAG variables - use provided service or create new one
         if rag_service is not None:
+            # Caller provided an explicit RAG service instance
             self.rag = rag_service
+            self.rag_status = {"available": True, "source": "injected"}
             logger.info("Using provided RAG service")
         else:
             # Prefer an MCP-backed adapter if configured to avoid heavy txtai deps
@@ -85,23 +86,36 @@ class LLMService:
                 try:
                     from bot.plugins.rag.mcp_adapter import MCPRAGAdapter
 
+                    # Instantiate the HTTP adapter and perform a lightweight health check
                     self.rag = MCPRAGAdapter(MCP_BASE_URL, api_key=MCP_API_KEY)
-                    logger.info("Using MCPRAGAdapter pointing to %s", MCP_BASE_URL)
-                except Exception as e:
-                    # If adapter fails to init, try local RAGService if available
-                    if RAGService is not None:
-                        logger.warning("Failed to initialize MCP adapter (%s) — falling back to local RAGService: %s", MCP_BASE_URL, e)
-                        self.rag = RAGService()
+
+                    # Verify the backend is responsive via /health
+                    health_url = MCP_BASE_URL.rstrip('/') + '/health'
+                    health_headers = {}
+                    if MCP_API_KEY:
+                        health_headers['Authorization'] = f'Bearer {MCP_API_KEY}'
+                    resp = requests.get(health_url, headers=health_headers, timeout=5)
+                    if not resp.ok:
+                        # Mark RAG as unavailable but allow bot to continue
+                        self.rag_status = {"available": False, "source": "mcp", "reason": f"health {resp.status_code}"}
+                        logger.warning("MCP RAG health check returned %s: %s", resp.status_code, resp.text)
+                        self.rag = None
                     else:
-                        logger.error("Failed to initialize MCP adapter (%s) and no local RAGService available: %s", MCP_BASE_URL, e)
-                        raise
+                        self.rag_status = {"available": True, "source": "mcp"}
+                        logger.info("Using MCPRAGAdapter pointing to %s (health OK)", MCP_BASE_URL)
+                except Exception as e:
+                    # Don't crash the whole bot; mark RAG unavailable and continue
+                    logger.error("Failed to initialize MCP adapter or health-check (%s): %s", MCP_BASE_URL, e)
+                    self.rag = None
+                    self.rag_status = {"available": False, "source": "mcp", "reason": str(e)}
             else:
-                if RAGService is None:
-                    logger.error("No local RAGService available and MCP_BASE_URL not configured. Please set MCP_BASE_URL or provide a rag_service instance.")
-                    raise RuntimeError("No RAG backend configured")
-                self.rag = RAGService()
-                logger.info("Created new RAG service")
+                # No MCP configured and no injected service — operate without RAG
+                logger.warning("No RAG backend configured: operating without knowledge-base retrieval. Set MCP_BASE_URL or pass a rag_service instance to enable RAG features.")
+                self.rag = None
+                self.rag_status = {"available": False, "source": "none", "reason": "no backend configured"}
         # Build a list of all indexed file paths from the embeddings database (once)
+        # If RAG is unavailable we still allow the bot to run; update_rag_variables
+        # will handle the None case.
         self.update_rag_variables()
 
         # Thread context caching - tracks what files Nancy has looked at per thread
@@ -181,6 +195,12 @@ class LLMService:
             self._save_thread_cache()
 
     def update_rag_variables(self):
+        # If RAG is not available, populate empty structures and return
+        if not getattr(self, 'rag', None):
+            self.all_indexed_files = []
+            self.indexed_file_map = {}
+            return
+
         all_indexed_docs = list(self.rag.embeddings.database.search("select id, text from txtai"))
         self.all_indexed_files = [doc['id'] for doc in all_indexed_docs]
         self.indexed_file_map = {doc['id']: doc['text'] for doc in all_indexed_docs}
@@ -207,17 +227,34 @@ class LLMService:
                 context_parts = []
                 for doc_id in cached_doc_ids:
                     if doc_id in self.indexed_file_map:
-                        github_url = self.rag._get_github_url(doc_id)
+                        github_url = None
+                        if getattr(self, 'rag', None):
+                            try:
+                                github_url = self.rag._get_github_url(doc_id)
+                            except Exception:
+                                github_url = None
                         if github_url:
                             # Provide both file path (for tools) and GitHub URL (for users)
                             context_parts.append(f"Source: {doc_id}\nGitHub URL: {github_url}\n{self.indexed_file_map[doc_id]}")
                         else:
                             context_parts.append(f"Source: {doc_id}\n{self.indexed_file_map[doc_id]}")
                 
-                return "\n\n".join(context_parts) if context_parts else self.rag.get_context_for_query(query)
+                if context_parts:
+                    return "\n\n".join(context_parts)
+                # Fallback to RAG only if available
+                if getattr(self, 'rag', None):
+                    return self.rag.get_context_for_query(query)
+                # Otherwise return a placeholder noting RAG is unavailable
+                return f"[RAG UNAVAILABLE: {self.rag_status}]\nNo knowledge-base context available."
         
         # Normal RAG search for channel messages or new threads
-        return self.rag.get_context_for_query(query)
+        if getattr(self, 'rag', None):
+            try:
+                return self.rag.get_context_for_query(query)
+            except Exception:
+                return f"[RAG UNAVAILABLE: {self.rag_status}]\nNo knowledge-base context available."
+        else:
+            return f"[RAG UNAVAILABLE: {self.rag_status}]\nNo knowledge-base context available."
 
     def construct_query_payload(self, query: str, context: str, conversation_history: list = None) -> dict:
         # Compose the full prompt

@@ -313,12 +313,34 @@ Add a small adapter layer so the bot can call a running MCP server (local or rem
 
 Quick checklist (hand-off friendly)
 ----------------------------------
-- [ ] Create `bot/plugins/rag/mcp_adapter.py` implementing the adapter contract below
-- [ ] Wire `bot/plugins/llm/llm_service.py` to instantiate `MCPRAGAdapter` when `MCP_BASE_URL` is present
+- [x] Create `bot/plugins/rag/mcp_adapter.py` implementing the adapter contract below
+- [x] Wire `bot/plugins/llm/llm_service.py` to instantiate `MCPRAGAdapter` when `MCP_BASE_URL` is present
 - [ ] Add unit tests: `tests/test_mcp_adapter.py` (mock MCP responses)
 - [ ] Add integration/smoke test gated by env var `MCP_INTEGRATION_TEST=true`
 - [ ] Add `.env` keys to `bot/config/.env.example`: `MCP_BASE_URL`, `MCP_API_KEY`
 - [ ] Stage rollout: enable MCP usage with env flag; keep fallback to local `RAGService`
+
+Additional immediate work (v0.5 - health/status & tests)
+-----------------------------------------------
+- [ ] Update Slack home view to include a RAG health block showing `LLMService.rag_status` and last-checked time. Implement dynamic injection in `InteractiveHandler.handle_home_opened`.
+- [ ] Add a periodic background re-check (best-effort): small async task that polls MCP `/health` every N seconds (configurable), updates `LLMService.rag_status`, and triggers a home-view refresh when status changes.
+- [ ] Add unit tests that simulate Slack slash command POSTs to `/slack/commands` (form-encoded). Place tests in `tests/test_slash_command_handler.py` and use aiohttp test utilities to call `NancyBot.handle_command`.
+- [ ] Add integration/smoke test gated by env var `MCP_INTEGRATION_TEST=true` which will POST to a running MCP server and validate end-to-end reconnect flow.
+
+Notes on Slack registration and manifest
+--------------------------------------
+- Add the `/status` slash command to the Slack app manifest (see `manifest.json`), pointing to the bot's `/slack/commands` endpoint. The command should be ephemeral by default and accept an optional `reconnect` argument.
+
+Testing locally
+---------------
+- To simulate Slack during tests, send an application/x-www-form-urlencoded POST with fields `command`, `user_id`, and optional `text` to `/slack/commands` (the repository tests will cover this).
+
+Priority
+--------
+1. Unit tests for slash command (fast feedback)
+2. Home view health injection and publish (UI visible)
+3. Periodic background poll + optional presence/emoji update
+4. Integration test gated by env var and manifest changes
 
 Adapter contract (minimal API)
 ------------------------------
