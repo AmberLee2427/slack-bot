@@ -9,7 +9,7 @@ import requests
 import json
 import re
 import difflib
-from bot.plugins.rag.rag_service import RAGService
+from rag_core.service import RAGService
 from dotenv import load_dotenv
 
 # environment file 
@@ -78,8 +78,29 @@ class LLMService:
             self.rag = rag_service
             logger.info("Using provided RAG service")
         else:
-            self.rag = RAGService()
-            logger.info("Created new RAG service")
+            # Prefer an MCP-backed adapter if configured to avoid heavy txtai deps
+            MCP_BASE_URL = os.environ.get("MCP_BASE_URL")
+            MCP_API_KEY = os.environ.get("MCP_API_KEY")
+            if MCP_BASE_URL:
+                try:
+                    from bot.plugins.rag.mcp_adapter import MCPRAGAdapter
+
+                    self.rag = MCPRAGAdapter(MCP_BASE_URL, api_key=MCP_API_KEY)
+                    logger.info("Using MCPRAGAdapter pointing to %s", MCP_BASE_URL)
+                except Exception as e:
+                    # If adapter fails to init, try local RAGService if available
+                    if RAGService is not None:
+                        logger.warning("Failed to initialize MCP adapter (%s) — falling back to local RAGService: %s", MCP_BASE_URL, e)
+                        self.rag = RAGService()
+                    else:
+                        logger.error("Failed to initialize MCP adapter (%s) and no local RAGService available: %s", MCP_BASE_URL, e)
+                        raise
+            else:
+                if RAGService is None:
+                    logger.error("No local RAGService available and MCP_BASE_URL not configured. Please set MCP_BASE_URL or provide a rag_service instance.")
+                    raise RuntimeError("No RAG backend configured")
+                self.rag = RAGService()
+                logger.info("Created new RAG service")
         # Build a list of all indexed file paths from the embeddings database (once)
         self.update_rag_variables()
 

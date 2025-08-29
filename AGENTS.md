@@ -4,18 +4,11 @@
 
 This repository contains a **RAG-powered Slack bot** designed to support participants in the **Roman Galactic Exoplanet Survey - Project Infrastructure Team data challenge**. The bot serves as an intelligent assistant that can answer questions about microlensing analysis, data challenge procedures, and related tools by leveraging a comprehensive knowledge base of microlensing resources.
 
-## Current Status (v3.0 - Dual Embedding System)
+> Nancy is pre-release and there is no requirement for maintaining backwards compatanility.
+
+## Current Status (v0.4 - Make Nancy Smarter)
 
 ### ✅ **Recently Completed**
-- **Dual Embedding Architecture**: General text model (sentence-transformers/all-MiniLM-L6-v2) + Code-specific model (microsoft/codebert-base)
-- **Smart File Type Detection**: Automatic categorization of files as code/mixed/docs for optimal embedding model weighting
-- **Enhanced Knowledge Base Pipeline**: 937 documents indexed with comprehensive failure tracking and monitoring
-- **Model Weights System**: Dynamic document weighting with extension-based and path-based rules
-- **Environment-Driven Configuration**: Dual embedding controlled via .env variables
-- **Notebook Processing**: .nb.txt conversion preserving notebook identity while preventing duplicates
-- **Interactive Slack Features**: Home tab with Block Kit UI, button-based navigation
-
-### 🚀 **New Requirements (v3.1)**
 
 #### 1. **Enhanced Context Presentation**
 - **Links in System Text**: Replace plain filenames with clickable GitHub links in LLM context
@@ -32,12 +25,20 @@ This repository contains a **RAG-powered Slack bot** designed to support partici
 - **Graceful Degradation**: Informative messages when limits are reached
 - **Admin Overrides**: Configurable limits and bypass mechanisms for power users
 
+### 🚀 **New Requirements (v0.5)**
+
+#### Refactor for separately run RAG service (local or remote)
+
+#### Cull unused depedencies.
+
 ## Repository Structure
 
 ```
 slack-bot/
-├── src/
-│   ├── txtai/                    # Embeddings database and RAG framework
+├── ref/                         # Repos for agent context (not installing from source)
+│   ├── txtai/                   # Embeddings database and RAG framework
+│   ├── nb4llm/                  # ipynb2txt conversion tool
+│   ├── nancy-brain/             # Modular RAG service
 │   └── slack-machine/           # Slack bot framework
 ├── knowledge_base/              # Knowledge base pipeline
 │   ├── raw/                     # Original repositories and resources
@@ -52,16 +53,22 @@ slack-bot/
 │       ├── config.yml           # txtai configuration
 │       └── models/              # Cached embedding models
 ├── bot/                         # Bot implementation
+│   ├── config/                  # Keys, tokens, cache
+│   ├── home/                    # Slack block kit
+│   ├── plugins/
+│   │   └── llm/                 # llm service, tools, system prompt
+│   ├── utils/.                  # Utility/Slack functions and handlers
+│   └── __init__.py.             # Slack bot framework
 ├── scripts/                     # Build and maintenance scripts
 ├── docs/                        # Documentation
 ├── tests/                       # Testing scripts and environment
 ├── pyproject.toml               # Dependencies
-├── local_settings.py            # Bot configuration (not in git)
+├── manifest.json                # Bot configuration settings on Slack
 ├── .gitignore                   # Git ignore rules (includes knowledge_base/raw)
 └── AGENTS.md                    # This file - AI agent guide
 ```
 
-## Data Pipeline (Current - v2.0)
+## Data Pipeline (v0.2)
 
 ### Stage 1: Raw Resources (`knowledge_base/raw/`)
 - **Git repositories**: Cloned microlensing tools, notebooks, documentation sites
@@ -84,7 +91,7 @@ slack-bot/
 - **Model Weights**: Individual document scoring stored in `config/model_weights.yaml`
 - **Unified Search**: Merged dual scoring with comprehensive reweighting pipeline
 
-## Technical Architecture (v3.0)
+## Technical Architecture (v0.3)
 
 ### Dual Embedding System
 - **Two Embedding Indices**: 
@@ -110,7 +117,7 @@ slack-bot/
 
 ## Current Status and Next Steps
 
-### ✅ **Fully Implemented (v3.0)**
+### ✅ **Fully Implemented (v0.3)**
 - **Dual Embedding System**: General + code models with intelligent merging
 - **Complete PDF Processing**: Both repository-embedded and standalone articles
 - **Notebook Conversion**: nb4llm integration preventing duplicates with .nb.txt extension
@@ -119,21 +126,16 @@ slack-bot/
 - **Interactive Slack Interface**: Home tab with Block Kit UI and button navigation
 - **Failure Tracking**: Comprehensive pipeline monitoring and reporting
 
-### 🔄 **Priority Implementation Plan (v3.1)**
+### ✅ **Fully Implemented (v0.4)**
 
-#### **Phase 1: Enhanced Context Presentation (High Priority)**
 - **GitHub Link Integration**: Replace filenames with clickable links in system messages
 - **Master Branch URLs**: Switch from `/blob/main/` to `/blob/master/` for stability
 - **Implementation**: Modify `get_context_for_query()` and `get_detailed_context()` methods
 - **Timeline**: 1-2 hours
-
-#### **Phase 2: "Keep Cooking" Interactive Feature (Medium Priority)**  
 - **Button Implementation**: Add "Continue Analysis" button to Nancy's responses
 - **Context Preservation**: Maintain conversation state for follow-up expansions
 - **Handler Extension**: Extend `InteractiveHandler` with new button action
 - **Timeline**: 2-3 hours
-
-#### **Phase 3: Daily Rate Limiting (Medium Priority)**
 - **User Tracking**: Implement per-user daily quota system
 - **Storage Backend**: Redis or SQLite for rate limit persistence
 - **Graceful Limits**: Informative messages when quotas exceeded
@@ -166,31 +168,6 @@ slack-bot/
 - **GitHub Integration**: Direct source links enhance user experience and source verification
 - **Environment-Driven**: All features controllable via environment variables for deployment flexibility
 - **Performance Optimized**: Nancy is "super fast" - large candidate pools don't impact user experience
-
-## Immediate Next Steps (Recommended Priority Order)
-
-### 1. **GitHub Link Enhancement** (Start Here - Quick Win)
-**Why First**: Simple change with immediate UX improvement, affects core functionality
-- Modify RAG service context methods to use links instead of filenames
-- Switch to master branch for stability  
-- Test with existing dual embedding system
-
-### 2. **Master Branch URL Fix** (Coupled with #1)  
-**Why Second**: Natural coupling with GitHub link work, addresses stability concerns
-- Single line change in `_get_github_url()` method
-- Immediate stability improvement for existing links
-
-### 3. **"Keep Cooking" Feature** (High Impact)
-**Why Third**: Leverages existing interactive infrastructure, major UX enhancement
-- Extends existing `InteractiveHandler` capabilities
-- Provides user control over response depth
-- Maintains conversation context
-
-### 4. **Daily Rate Limiting** (Resource Management)
-**Why Fourth**: Important for cost control but requires new infrastructure
-- Implement user tracking and quota system
-- Add graceful degradation messaging
-- Configure admin overrides
 
 ## Admin Guide: Rate Limiting Management
 
@@ -315,8 +292,8 @@ export DAILY_RATE_LIMIT=200
 
 ## Git Strategy
 
-- Track only the embeddings database, source code, and configuration files.
-- Ignore raw data, local settings, and model caches.
+- Track only the embeddings database config, source code, and configuration files.
+- Ignore raw data, indexed embeddings, local settings, and model caches.
 
 ## Important Notes
 
@@ -327,3 +304,57 @@ export DAILY_RATE_LIMIT=200
 ---
 
 This guide reflects the current state of the project as of the latest development cycle. See README.md for user-facing details and scripts/demo_query.py for the latest RAG/LLM workflow. 
+
+## MCP Adapter Refactor Plan
+
+Purpose
+-------
+Add a small adapter layer so the bot can call a running MCP server (local or remote) using the exact same surface the code expects from the current `RAGService`. This minimizes code changes in `bot/plugins/llm` and allows a staged rollout with a fallback to the existing local RAG implementation.
+
+Quick checklist (hand-off friendly)
+----------------------------------
+- [ ] Create `bot/plugins/rag/mcp_adapter.py` implementing the adapter contract below
+- [ ] Wire `bot/plugins/llm/llm_service.py` to instantiate `MCPRAGAdapter` when `MCP_BASE_URL` is present
+- [ ] Add unit tests: `tests/test_mcp_adapter.py` (mock MCP responses)
+- [ ] Add integration/smoke test gated by env var `MCP_INTEGRATION_TEST=true`
+- [ ] Add `.env` keys to `bot/config/.env.example`: `MCP_BASE_URL`, `MCP_API_KEY`
+- [ ] Stage rollout: enable MCP usage with env flag; keep fallback to local `RAGService`
+
+Adapter contract (minimal API)
+------------------------------
+- Class: MCPRAGAdapter(base_url: str, api_key: Optional[str] = None, fallback: Optional[RAGService] = None)
+  - search(query: str, limit: int = 5) -> list[dict]
+    - returns items: {id: str, text: str, score: float, extension_weight: float, model_score: float, adjusted_score: float}
+  - get_context_for_query(query: str) -> str
+  - _get_github_url(doc_id: str) -> Optional[str]
+  - embeddings.database.search(sql: str) -> list[dict]  # maintains current SQL usage in tools.py
+  - Behavior: normalize MCP responses, raise clear exceptions for network/auth issues, and allow optional fallback to local RAG
+
+Files to add / update
+---------------------
+- Add: `bot/plugins/rag/mcp_adapter.py` (adapter implementation + lightweight `EmbeddingsDB` wrapper)
+- Update: `bot/plugins/llm/llm_service.py` (instantiate adapter when configured; keep `rag_service` injection working)
+- Update: `bot/plugins/llm/tools.py` tests to mock adapter behavior
+- Add tests: `tests/test_mcp_adapter.py`, update existing llm tests to use adapter mocks
+
+Testing and rollout notes
+-------------------------
+- Unit tests should mock the MCP endpoints and validate that adapter normalizes fields used by `tools.py` and `llm_service.py`.
+- Add an env-gated integration test that runs against a dev MCP server (`MCP_INTEGRATION_TEST=true`) — keep it opt-in for CI.
+- Default behavior: if `MCP_BASE_URL` unset or adapter fails on startup, fall back to local `RAGService` and log a warning.
+
+Environment variables
+---------------------
+- `MCP_BASE_URL` — base URL of running MCP server (optional)
+- `MCP_API_KEY` — API key / bearer token for MCP (optional)
+- `MCP_TIMEOUT` — adapter HTTP timeout in seconds (default 5)
+
+Estimated effort
+----------------
+- Adapter + unit tests: 0.5 - 1.5 days
+- Wiring `llm_service.py` + smoke tests: 0.5 day
+- Integration tests + staged rollout validation: 0.5 - 1 day
+
+Handoff pointer
+---------------
+If you pick this up, begin by implementing `MCPRAGAdapter.search()` and `get_context_for_query()` as mocked endpoints and update `llm_service.py` to instantiate the adapter only when `MCP_BASE_URL` is present. Run unit tests and then enable the integration test if a dev MCP server is available.
