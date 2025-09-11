@@ -6,7 +6,7 @@ This repository contains a **RAG-powered Slack bot** designed to support partici
 
 > Nancy is pre-release and there is no requirement for maintaining backwards compatanility.
 
-## Current Status (v0.4 - Make Nancy Smarter)
+## Current Stable Version (v0.4 - Make Nancy Smarter)
 
 ### ✅ **Recently Completed**
 
@@ -25,11 +25,80 @@ This repository contains a **RAG-powered Slack bot** designed to support partici
 - **Graceful Degradation**: Informative messages when limits are reached
 - **Admin Overrides**: Configurable limits and bypass mechanisms for power users
 
-### 🚀 **New Requirements (v0.5)**
+## 🚀 New Requirements (v0.5)
 
-#### Refactor for separately run RAG service (local or remote)
+### ✅ **Testing**
 
-#### Cull unused depedencies.
+#### 1. Refactor for separately run RAG service (local or remote)
+
+More details below in "Moved to Nancy Brain" section.
+
+#### 2. Cull unused depedencies.
+
+## Future Feature Additions (v0.6 - Nancy the Bouncer)
+
+### Automated Team Onboarding and Private Channel Creation
+
+**Overview**: This feature automates the process of adding new data challenge participants to the workspace and sorting them into private team channels. It uses an external webform to collect team information and a backend process triggered by new user joins to manage channel creation and invitations, ensuring teams are securely separated from the moment they arrive.
+
+---
+
+### Core Components
+
+#### 1\. **External Webform**
+
+-   **Purpose**: To collect team registration details before users join the Slack workspace.
+    
+-   **Fields**:
+    
+    -   `Team Name`: The desired name for the team and its private channel.
+        
+    -   `Team Member Emails`: A list of all emails for team members, including the captain.
+        
+-   **Implementation**: A simple Google Form or similar service that outputs responses to a Google Sheet. The confirmation message will direct users to the Slack workspace invite link.
+
+#### 2\. **Automation Trigger: New User Joins**
+
+-   **Event Listener**: The bot will listen for the `team_join` event from the Slack Events API.
+    
+-   **Trigger Action**: When a new user joins the workspace, the bot will immediately initiate the onboarding workflow.
+    
+
+#### 3\. **Conditional Onboarding Logic**
+
+The bot's main logic will execute the following steps upon a new user joining:
+
+1.  **Lookup User**: The bot will take the new user's email and look it up in the Google Sheet containing the webform responses.
+    
+2.  **Find Team**: From the sheet, it will identify the user's assigned **Team Name**.
+    
+3.  **Check for Existing Channel**: The bot will then search the Slack workspace to see if a private channel corresponding to the **Team Name** (e.g., `#team-data-divas`) already exists.
+    
+4.  **Execute Conditional Path**:
+    
+    -   **If Channel Does NOT Exist**:
+        
+        -   The bot creates a new private channel using the team name.
+            
+        -   The bot invites the new user who triggered the workflow into the channel.
+            
+        -   This user is now the first member of their team in the workspace.
+            
+    -   **If Channel Already Exists**:
+        
+        -   The bot simply invites the new user to the existing private channel.
+            
+---
+
+### User Experience
+
+-   **For Participants**: The process is seamless. A user fills out a form, joins the workspace via a link, and is automatically invited to their private team channel moments later. There's no need to search for channels or wait for a manual invitation.
+    
+-   **For Admins**: The system is entirely hands-off after the initial setup. It eliminates the manual work of creating channels and managing permissions for dozens of participants, while ensuring team data remains private and secure. The fallback is the original manual process, so there's no risk if the automation fails.
+    
+### Future Enhancements
+
+-   A slash command (`/team-admin`) for team captains to manage their team (edit name, add/remove members) without needing admin privileges. The bot would handle these requests by updating the Google Sheet and adjusting channel membership.
 
 ## Repository Structure
 
@@ -40,7 +109,7 @@ slack-bot/
 │   ├── nb4llm/                  # ipynb2txt conversion tool
 │   ├── nancy-brain/             # Modular RAG service
 │   └── slack-machine/           # Slack bot framework
-├── knowledge_base/              # Knowledge base pipeline
+├── knowledge_base/              # Knowledge base pipeline (managed by `nancy-brain` in v>0.5)
 │   ├── raw/                     # Original repositories and resources
 │   │   ├── microlensing_tools/  # Open source microlensing analysis tools
 │   │   ├── jupyter_notebooks/   # Microlensing analysis notebooks
