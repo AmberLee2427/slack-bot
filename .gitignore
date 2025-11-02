@@ -151,6 +151,9 @@ knowledge_base/embeddings/models/
 bot/config/.env
 config/model_weights.yaml  # Dynamic learning weights from Nancy's WEIGHT: tool
 .env
+ref/arXiv-2510.18234v1
+*GEMINI.md
+
 # VSCode workspace
 *.code-workspace
 
