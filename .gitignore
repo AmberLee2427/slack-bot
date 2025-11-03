@@ -156,5 +156,6 @@ ref/arXiv-2510.18234v1
 
 # VSCode workspace
 *.code-workspace
+.vscode
 
 SLACK.md
