@@ -4,3 +4,6 @@
 [submodule "src/nancy-brain"]
 	path = src/nancy-brain
 	url = https://github.com/AmberLee2427/nancy-brain.git
+[submodule "ref/nancy-brain"]
+	path = ref/nancy-brain
+	url = https://github.com/AmberLee2427/nancy-brain.git
