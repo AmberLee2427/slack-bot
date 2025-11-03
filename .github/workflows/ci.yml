@@ -30,6 +30,7 @@ jobs:
       - name: Run pytest
         env:
           PYTHONPATH: ${{ github.workspace }}
+          NB_ALLOW_INSECURE: "true"
         run: pytest -q
 
   mcp_integration:
@@ -53,4 +54,5 @@ jobs:
         env:
           MCP_BASE_URL: ${{ secrets.MCP_BASE_URL }}
           MCP_API_KEY: ${{ secrets.MCP_API_KEY }}
+          NB_ALLOW_INSECURE: "true"
         run: pytest -q tests/test_mcp_integration.py -q
