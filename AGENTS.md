@@ -1,79 +1,21 @@
 # AI Agents Guide: Roman Galactic Exoplanet Survey Slack Bot
 
-## Project Overview
+## MCP Adapter Backend (v0.5+)
 
-This repository contains a **RAG-powered Slack bot** designed to support participants in the **Roman Galactic Exoplanet Survey - Project Infrastructure Team data challenge**. The bot serves as an intelligent assistant that can answer questions about microlensing analysis, data challenge procedures, and related tools by leveraging a comprehensive knowledge base of microlensing resources.
+**As of v0.5, Nancy uses the MCPRAGAdapter as the *sole* supported RAG backend.**
 
-> Nancy is pre-release and there is no requirement for maintaining backwards compatanility.
+- All legacy fallback logic and the old RAGService are removed.
+- MCP configuration is required for all knowledge-base and RAG features.
+- The adapter contract is:
+  - `MCPRAGAdapter(base_url: str, api_key: Optional[str] = None)`
+  - `search(query: str, limit: int = 5) -> list[dict]`
+  - `get_context_for_query(query: str) -> str`
+  - `_get_github_url(doc_id: str) -> Optional[str>`
+  - `embeddings.database.search(sql: str) -> list[dict]`
 
-## Current Stable Version (v0.4 - Make Nancy Smarter)
+**No fallback to legacy RAGService or txtai is available.**
 
-### ✅ **Recently Completed**
-
-#### 1. **Enhanced Context Presentation**
-- **Links in System Text**: Replace plain filenames with clickable GitHub links in LLM context
-- **Stable GitHub URLs**: Switch from "main" to "master" branch links for better stability
-- **Improved User Experience**: Make source attribution more discoverable and actionable
-
-#### 2. **"Keep Cooking" Feature**
-- **Interactive Continuation**: Add system message with button allowing Nancy to continue/expand responses
-- **User Control**: Let users request deeper analysis or additional perspectives on demand
-- **Seamless Flow**: Maintain conversation context while providing optional expansion
-
-#### 3. **Daily Rate Limiting**
-- **Per-User Limits**: Implement daily usage quotas to manage API costs and ensure fair access
-- **Graceful Degradation**: Informative messages when limits are reached
-- **Admin Overrides**: Configurable limits and bypass mechanisms for power users
-
-## 🚀 New Requirements (v0.5)
-
-### ✅ **Testing**
-
-#### 1. Refactor for separately run RAG service (local or remote)
-
-More details below in "Moved to Nancy Brain" section.
-
-#### 2. Cull unused depedencies.
-
-## Future Feature Additions (v0.6 - Nancy the Bouncer)
-
-### Automated Team Onboarding and Private Channel Creation
-
-**Overview**: This feature automates the process of adding new data challenge participants to the workspace and sorting them into private team channels. It uses an external webform to collect team information and a backend process triggered by new user joins to manage channel creation and invitations, ensuring teams are securely separated from the moment they arrive.
-
----
-
-### Core Components
-
-#### 1\. **External Webform**
-
--   **Purpose**: To collect team registration details before users join the Slack workspace.
-    
--   **Fields**:
-    
-    -   `Team Name`: The desired name for the team and its private channel.
-        
-    -   `Team Member Emails`: A list of all emails for team members, including the captain.
-        
--   **Implementation**: A simple Google Form or similar service that outputs responses to a Google Sheet. The confirmation message will direct users to the Slack workspace invite link.
-
-#### 2\. **Automation Trigger: New User Joins**
-
--   **Event Listener**: The bot will listen for the `team_join` event from the Slack Events API.
-    
--   **Trigger Action**: When a new user joins the workspace, the bot will immediately initiate the onboarding workflow.
-    
-
-#### 3\. **Conditional Onboarding Logic**
-
-The bot's main logic will execute the following steps upon a new user joining:
-
-1.  **Lookup User**: The bot will take the new user's email and look it up in the Google Sheet containing the webform responses.
-    
-2.  **Find Team**: From the sheet, it will identify the user's assigned **Team Name**.
-    
-3.  **Check for Existing Channel**: The bot will then search the Slack workspace to see if a private channel corresponding to the **Team Name** (e.g., `#team-data-divas`) already exists.
-    
+All tests and documentation have been updated to reflect this single-backend approach. MCPRAGAdapter is required for all deployments.
 4.  **Execute Conditional Path**:
     
     -   **If Channel Does NOT Exist**:

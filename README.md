@@ -51,9 +51,11 @@ The bot has access to:
 - **Research papers** and journal articles on microlensing
 - **Web resources** from Microlensing Source and related sites
 
+**Note:** As of v0.5, Nancy uses the MCPRAGAdapter as the *sole* supported RAG backend. The legacy RAGService and txtai-based backends are no longer supported or present in the codebase. MCP configuration is required for all knowledge-base features.
+
 ### 🔧 Technical Capabilities
-- **Semantic search** using advanced embeddings
-- **RAG (Retrieval Augmented Generation)** for accurate responses
+- **Semantic search** via MCPRAGAdapter (MCP server required)
+- **RAG (Retrieval Augmented Generation)** for accurate responses (MCP only)
 - **Slack integration** with rich message formatting
 - **Thread support** for extended conversations
 - **Slash commands** for quick access to common functions
@@ -71,7 +73,7 @@ GitHub Pages sites           Direct text (code/docs)          Semantic search
 ```
 1. **Raw Stage**: Git repositories, downloaded PDFs, documentation sites
 2. **Processing Stage**: (Knowledge base building is maintained outside this bot repository.)
-3. **Embeddings Stage**: See the external knowledge-base project for embedding pipelines and index creation.
+3. **Embeddings Stage**: See the external knowledge-base project for embedding pipelines and index creation. Nancy now requires an MCP server for all RAG/knowledge-base features.
 
 ## 🛠️ Setup & Installation
 
@@ -278,17 +280,7 @@ class CustomPlugin(MachineBasePlugin):
 - `LOG_LEVEL`: Logging level (default: `INFO`)
 
 ### Knowledge Base Settings
-The bot's knowledge base can be customized in `config/knowledge_base.yml`:
-```yaml
-repositories:
-  - name: microlens-submit
-    url: https://github.com/roman-telescope/microlens-submit
-    type: submission_tool
-  
-  - name: example-analysis-tool
-    url: https://github.com/example/microlensing-tool
-    type: analysis_tool
-```
+The bot's knowledge base is now managed by the MCP server. All configuration and indexing is handled externally; Nancy connects to the MCP via the MCPRAGAdapter. See the MCP documentation for details.
 
 ## 🧪 Development
 
@@ -307,6 +299,7 @@ slack-bot/
 
 ### Running Tests
 ```bash
+# Make sure MCP_BASE_URL is set and the MCP server is running
 pytest tests/
 ```
 

@@ -26,17 +26,7 @@ def test_llm_service():
         sys.path.insert(0, str(Path(__file__).parent.parent))
         
         from bot.plugins.llm.llm_service import LLMService
-        from bot.plugins.rag.rag_service import get_rag_service
-        
-        # Check if RAG service is available first
-        rag = get_rag_service()
-        if not rag.is_available():
-            print("❌ RAG service not available - need RAG for LLM tests")
-            return False
-        
-        print("✅ RAG service available\n")
-        
-        # Initialize LLM service
+        # Only MCPRAGAdapter is supported; LLMService will fail fast if not configured
         llm = LLMService(debugging=True)
         print("✅ LLM service initialized\n")
         

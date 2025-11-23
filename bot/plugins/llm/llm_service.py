@@ -72,47 +72,29 @@ class LLMService:
         logger.info(f"LLM Service initialized with debugging={'ON' if self.debugging else 'OFF'}")
         logger.info(f"Daily rate limit set to: {daily_rate_limit} queries per user")
 
-        # RAG variables - use provided service or create new one
-        if rag_service is not None:
-            # Caller provided an explicit RAG service instance
-            self.rag = rag_service
-            self.rag_status = {"available": True, "source": "injected"}
-            logger.info("Using provided RAG service")
-        else:
-            # Prefer an MCP-backed adapter if configured to avoid heavy txtai deps
-            MCP_BASE_URL = os.environ.get("MCP_BASE_URL")
-            MCP_API_KEY = os.environ.get("MCP_API_KEY")
-            if MCP_BASE_URL:
-                try:
-                    from bot.plugins.rag.mcp_adapter import MCPRAGAdapter
-
-                    # Instantiate the HTTP adapter and perform a lightweight health check
-                    self.rag = MCPRAGAdapter(MCP_BASE_URL, api_key=MCP_API_KEY)
-
-                    # Verify the backend is responsive via /health
-                    health_url = MCP_BASE_URL.rstrip('/') + '/health'
-                    health_headers = {}
-                    if MCP_API_KEY:
-                        health_headers['Authorization'] = f'Bearer {MCP_API_KEY}'
-                    resp = requests.get(health_url, headers=health_headers, timeout=5)
-                    if not resp.ok:
-                        # Mark RAG as unavailable but allow bot to continue
-                        self.rag_status = {"available": False, "source": "mcp", "reason": f"health {resp.status_code}"}
-                        logger.warning("MCP RAG health check returned %s: %s", resp.status_code, resp.text)
-                        self.rag = None
-                    else:
-                        self.rag_status = {"available": True, "source": "mcp"}
-                        logger.info("Using MCPRAGAdapter pointing to %s (health OK)", MCP_BASE_URL)
-                except Exception as e:
-                    # Don't crash the whole bot; mark RAG unavailable and continue
-                    logger.error("Failed to initialize MCP adapter or health-check (%s): %s", MCP_BASE_URL, e)
-                    self.rag = None
-                    self.rag_status = {"available": False, "source": "mcp", "reason": str(e)}
-            else:
-                # No MCP configured and no injected service — operate without RAG
-                logger.warning("No RAG backend configured: operating without knowledge-base retrieval. Set MCP_BASE_URL or pass a rag_service instance to enable RAG features.")
-                self.rag = None
-                self.rag_status = {"available": False, "source": "none", "reason": "no backend configured"}
+        # RAG backend: require MCPRAGAdapter, fail fast if not configured
+        MCP_BASE_URL = os.environ.get("MCP_BASE_URL")
+        MCP_API_KEY = os.environ.get("MCP_API_KEY")
+        if not MCP_BASE_URL:
+            logger.error("MCP_BASE_URL is not set. MCPRAGAdapter is now required as the only supported RAG backend. Exiting.")
+            raise RuntimeError("MCP_BASE_URL is required for Nancy. No legacy RAGService fallback is available.")
+        from bot.plugins.rag.mcp_adapter import MCPRAGAdapter
+        try:
+            self.rag = MCPRAGAdapter(MCP_BASE_URL, api_key=MCP_API_KEY)
+            # Health check
+            health_url = MCP_BASE_URL.rstrip('/') + '/health'
+            health_headers = {}
+            if MCP_API_KEY:
+                health_headers['Authorization'] = f'Bearer {MCP_API_KEY}'
+            resp = requests.get(health_url, headers=health_headers, timeout=5)
+            if not resp.ok:
+                logger.error("MCP RAG health check failed: %s: %s", resp.status_code, resp.text)
+                raise RuntimeError(f"MCPRAGAdapter health check failed: {resp.status_code} {resp.text}")
+            self.rag_status = {"available": True, "source": "mcp"}
+            logger.info("Using MCPRAGAdapter pointing to %s (health OK)", MCP_BASE_URL)
+        except Exception as e:
+            logger.error("Failed to initialize MCPRAGAdapter or health-check (%s): %s", MCP_BASE_URL, e)
+            raise RuntimeError(f"Failed to initialize MCPRAGAdapter: {e}")
         # Build a list of all indexed file paths from the embeddings database (once)
         # If RAG is unavailable we still allow the bot to run; update_rag_variables
         # will handle the None case.
