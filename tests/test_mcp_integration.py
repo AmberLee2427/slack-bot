@@ -7,8 +7,9 @@ MCP_BASE = os.environ.get("MCP_BASE_URL")
 MCP_ENABLED = os.environ.get("MCP_INTEGRATION_TEST", "false").lower() == "true"
 
 
+
 @pytest.mark.skipif(not MCP_ENABLED or not MCP_BASE, reason="MCP integration tests are disabled")
-def test_mcp_health_endpoint_live():
+def test_mcp_health_endpoint_live(mcp_server):
     """Simple live test that queries the MCP /health endpoint and validates a JSON response."""
     url = MCP_BASE.rstrip("/") + "/health"
     headers = {}

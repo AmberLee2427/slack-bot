@@ -1,3 +1,49 @@
+## 🧪 MCP Integration Test Setup
+
+Integration tests for the MCP server are provided in `tests/test_mcp_integration.py` and use a pytest fixture to automatically start and stop the MCP server for each test session.
+
+### How it works
+- The fixture in `tests/conftest.py` launches the MCP server in a subprocess before tests run.
+- It waits for the `/health` endpoint to respond with status `ok`.
+- Tests are marked to use the fixture and will only run if `MCP_INTEGRATION_TEST=true` and `MCP_BASE_URL` are set in your environment.
+- After tests finish, the server is terminated automatically.
+
+### Usage
+1. **Build the knowledge base and ensure embeddings/configs are present.**
+2. **Set environment variables:**
+   ```bash
+   export MCP_INTEGRATION_TEST=true
+   export MCP_BASE_URL="http://localhost:8000"
+   # (Optional) export MCP_API_KEY=your-key
+   ```
+3. **Run tests:**
+   ```bash
+   pytest tests/test_mcp_integration.py
+   ```
+   The fixture will start the MCP server, wait for health, and run the tests.
+
+### Customization
+- The MCP server path and health URL are set in the fixture (`tests/conftest.py`).
+- You can adjust timeouts or paths as needed for your environment.
+
+### Troubleshooting
+- If you see connection errors, check that the knowledge base is built and the MCP server can start with your config/embeddings.
+- Ensure no other process is using port 8000.
+- Review logs for missing files or startup errors.
+
+### Example fixture (see `tests/conftest.py`):
+```python
+@pytest.fixture(scope="session")
+def mcp_server():
+   ...
+```
+
+### Example test usage:
+```python
+def test_mcp_health_endpoint_live(mcp_server):
+   ...
+```
+
 # Roman Galactic Exoplanet Survey - AI Assistant Bot
 
 > AKA: Nancy
@@ -59,6 +105,26 @@ The bot has access to:
 - **Slack integration** with rich message formatting
 - **Thread support** for extended conversations
 - **Slash commands** for quick access to common functions
+
+## 🧪 End-to-End Passage Retrieval Tests
+
+As of v0.5+, the bot and MCP server support explicit passage/chunked retrieval with rich metadata. End-to-end integration tests are provided in `tests/test_mcp_passage_retrieval.py` to validate:
+
+- **Passage retrieval**: Ensures the MCP server returns document passages with explicit metadata, including line ranges, total lines, partial indication, and GitHub URL.
+- **Batch passage retrieval**: Validates multi-passage context assembly and metadata for each chunk.
+- **Requirements**:
+  - MCP server must be running and accessible via `MCP_BASE_URL`.
+  - Set `MCP_INTEGRATION_TEST=true` in your environment to enable these tests.
+  - Tests require a valid document (e.g., `microlensing_tools/MulensModel/README.md`) in the knowledge base.
+
+**Test file:** `tests/test_mcp_passage_retrieval.py`
+
+**What is validated:**
+- Response includes line range, total lines, and partial/full indication
+- GitHub URL is present for each passage
+- Batch retrieval assembles context from multiple chunks
+
+See the test file for details and usage.
 
 ## 🏗️ Architecture
 
@@ -343,4 +409,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Built with ❤️ for the Roman Galactic Exoplanet Survey community** 
+**Built with ❤️ for the Roman Galactic Exoplanet Survey community**
