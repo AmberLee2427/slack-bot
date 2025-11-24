@@ -1,26 +1,30 @@
-import os
-import pytest
 import requests
 
+from bot.plugins.rag.mcp_adapter import MCPRAGAdapter
 
-MCP_BASE = os.environ.get("MCP_BASE_URL")
-MCP_ENABLED = os.environ.get("MCP_INTEGRATION_TEST", "false").lower() == "true"
+# Always target the local test server started by the session fixture
+MCP_BASE_URL = "http://localhost:8123"
 
 
-
-@pytest.mark.skipif(not MCP_ENABLED or not MCP_BASE, reason="MCP integration tests are disabled")
 def test_mcp_health_endpoint_live(mcp_server):
-    """Simple live test that queries the MCP /health endpoint and validates a JSON response."""
-    url = MCP_BASE.rstrip("/") + "/health"
-    headers = {}
-    api_key = os.environ.get("MCP_API_KEY")
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+    resp = requests.get(f"{MCP_BASE_URL.rstrip('/')}/health", timeout=10)
+    assert resp.status_code == 200
+    assert resp.json().get("status") in ("ok", "degraded")
 
-    resp = requests.get(url, headers=headers, timeout=10)
-    assert resp.status_code == 200, f"unexpected status: {resp.status_code} - {resp.text}"
-    payload = resp.json()
-    assert isinstance(payload, dict)
-    # expected keys from Nancy Brain health contract
-    assert "status" in payload
-    assert payload["status"] in ("ok", "degraded", "error")
+
+def test_mcp_adapter_round_trip(mcp_server):
+    adapter = MCPRAGAdapter(MCP_BASE_URL, timeout=15)
+
+    results = adapter.search("microlensing", limit=3)
+    assert results, "Expected search results from MCP server"
+    first = results[0]
+    assert first.get("id"), "Result missing id"
+    assert "text" in first, "Result missing text"
+
+    ctx = adapter.get_context_for_query("microlensing")
+    assert isinstance(ctx, str)
+    assert ctx.strip(), "Context should not be empty"
+
+    url = adapter._get_github_url(first["id"])
+    # Some docs may not have GitHub metadata; ensure call doesn't explode
+    assert url is None or isinstance(url, str)

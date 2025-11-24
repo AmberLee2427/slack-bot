@@ -1,3 +1,4 @@
+import sys
 import pytest
 
 from bot.plugins.rag.mcp_adapter import MCPRAGAdapter, MCPAdapterError
@@ -48,6 +49,7 @@ class FakeSession:
 
 
 def test_search_normalizes_fields():
+    import sys
     sess = FakeSession()
     adapter = MCPRAGAdapter("http://mcp.local", session=sess)
     results = adapter.search("query", limit=3)
@@ -58,6 +60,7 @@ def test_search_normalizes_fields():
 
 
 def test_get_context_for_query_joins_text():
+    import sys
     sess = FakeSession()
     adapter = MCPRAGAdapter("http://mcp.local", session=sess)
     ctx = adapter.get_context_for_query("query")
@@ -65,6 +68,7 @@ def test_get_context_for_query_joins_text():
 
 
 def test_embeddings_search_fallback_to_search():
+    import sys
     sess = FakeSession()
     adapter = MCPRAGAdapter("http://mcp.local", session=sess)
     rows = adapter.embeddings.database.search("select id, text from txtai")
@@ -73,6 +77,7 @@ def test_embeddings_search_fallback_to_search():
 
 
 def test_get_github_url_prefers_doc_endpoint_then_retrieve():
+    import sys
     sess = FakeSession()
     adapter = MCPRAGAdapter("http://mcp.local", session=sess)
     url = adapter._get_github_url("doc1")
@@ -80,6 +85,7 @@ def test_get_github_url_prefers_doc_endpoint_then_retrieve():
 
 
 def test_search_raises_on_bad_response():
+    import sys
     class BadSession(FakeSession):
         def get(self, url, params=None, timeout=None):
             return FakeResp({}, 500)
