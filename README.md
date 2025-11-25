@@ -1,54 +1,17 @@
-## 🧪 MCP Integration Test Setup
+## 🧪 MCP Integration Tests (auto-start)
 
-Integration tests for the MCP server are provided in `tests/test_mcp_integration.py` and use a pytest fixture to automatically start and stop the MCP server for each test session.
+Integration tests for the MCP server live in `tests/test_mcp_integration.py` and `tests/test_mcp_passage_retrieval.py`.
 
-### How it works
-- The fixture in `tests/conftest.py` launches the MCP server in a subprocess before tests run.
-- It waits for the `/health` endpoint to respond with status `ok`.
-- Tests are marked to use the fixture and will only run if `MCP_INTEGRATION_TEST=true` and `MCP_BASE_URL` are set in your environment.
-- After tests finish, the server is terminated automatically.
-
-### Usage
-1. **Build the knowledge base and ensure embeddings/configs are present.**
-2. **Set environment variables:**
-   ```bash
-   export MCP_INTEGRATION_TEST=true
-   export MCP_BASE_URL="http://localhost:8000"
-   # (Optional) export MCP_API_KEY=your-key
-   ```
-3. **Run tests:**
-   ```bash
-   pytest tests/test_mcp_integration.py
-   ```
-   The fixture will start the MCP server, wait for health, and run the tests.
-
-### Customization
-- The MCP server path and health URL are set in the fixture (`tests/conftest.py`).
-- You can adjust timeouts or paths as needed for your environment.
-
-### Troubleshooting
-- If you see connection errors, check that the knowledge base is built and the MCP server can start with your config/embeddings.
-- Ensure no other process is using port 8000.
-- Review logs for missing files or startup errors.
-
-### Example fixture (see `tests/conftest.py`):
-```python
-@pytest.fixture(scope="session")
-def mcp_server():
-   ...
-```
-
-### Example test usage:
-```python
-def test_mcp_health_endpoint_live(mcp_server):
-   ...
-```
+How it works:
+- `tests/conftest.py` auto-starts the MCP server (from `ref/nancy-brain`) on `http://localhost:8123` before the test session.
+- It waits for `/health` to report `ok`; after tests finish, the subprocess is terminated.
+- No env flags are required; ensure the KB embeddings/configs exist under `ref/nancy-brain/knowledge_base/embeddings`.
 
 # Roman Galactic Exoplanet Survey - AI Assistant Bot
 
 > AKA: Nancy
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](h5. **Create configuration**
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
    Create `bot/config/.env` with your tokens:
    ```env
    # Slack Configuration
@@ -108,38 +71,15 @@ The bot has access to:
 
 ## 🧪 End-to-End Passage Retrieval Tests
 
-As of v0.5+, the bot and MCP server support explicit passage/chunked retrieval with rich metadata. End-to-end integration tests are provided in `tests/test_mcp_passage_retrieval.py` to validate:
-
-- **Passage retrieval**: Ensures the MCP server returns document passages with explicit metadata, including line ranges, total lines, partial indication, and GitHub URL.
-- **Batch passage retrieval**: Validates multi-passage context assembly and metadata for each chunk.
-- **Requirements**:
-  - MCP server must be running and accessible via `MCP_BASE_URL`.
-  - Set `MCP_INTEGRATION_TEST=true` in your environment to enable these tests.
-  - Tests require a valid document (e.g., `microlensing_tools/MulensModel/README.md`) in the knowledge base.
-
-**Test file:** `tests/test_mcp_passage_retrieval.py`
-
-**What is validated:**
-- Response includes line range, total lines, and partial/full indication
-- GitHub URL is present for each passage
-- Batch retrieval assembles context from multiple chunks
-
-See the test file for details and usage.
+- Coverage in `tests/test_mcp_passage_retrieval.py` (runs with the auto-started MCP server on `localhost:8123`).
+- Validates passage retrieval metadata (line ranges, partial/full flag) and GitHub URL propagation.
+- Requires the KB artifacts under `ref/nancy-brain/knowledge_base/embeddings`.
 
 ## 🏗️ Architecture
 
-This bot is built using a sophisticated three-stage data pipeline:
-
-```
-Raw Sources          →     Multi-Format Processing     →      Unified Embeddings
-     ↓                            ↓                            ↓
-Git repositories              nb4llm (notebooks)            txtai vector database
-PDF articles                 Apache Tika (PDFs)                    ↓
-GitHub Pages sites           Direct text (code/docs)          Semantic search
-```
-1. **Raw Stage**: Git repositories, downloaded PDFs, documentation sites
-2. **Processing Stage**: (Knowledge base building is maintained outside this bot repository.)
-3. **Embeddings Stage**: See the external knowledge-base project for embedding pipelines and index creation. Nancy now requires an MCP server for all RAG/knowledge-base features.
+- **RAG backend:** MCPRAGAdapter talking to the MCP server in `ref/nancy-brain`.
+- **Knowledge base:** Built/maintained in `ref/nancy-brain`; this repo does not build embeddings.
+- **Tests:** Auto-start a local MCP server on `http://localhost:8123`.
 
 ## 🛠️ Setup & Installation
 
@@ -181,9 +121,12 @@ GitHub Pages sites           Direct text (code/docs)          Semantic search
    
    # Start ngrok tunnel (in a separate terminal)
    ngrok http 3000
-   
-   # Copy the public URL (e.g., https://abc123.ngrok-free.app)
    ```
+
+   Then update your Slack app URLs to use the ngrok HTTPS address shown (e.g., https://abc123.ngrok-free.app):
+   - Event Subscriptions → Request URL: `https://<ngrok>/slack/events`
+   - Interactivity → Request URL: `https://<ngrok>/slack/interactive`
+   - Slash commands (if any) → e.g., `https://<ngrok>/slack/commands`
 
 4. **Install dependencies**
    ```bash
@@ -192,9 +135,6 @@ GitHub Pages sites           Direct text (code/docs)          Semantic search
    
    # Or using pip
    pip install -e .
-   
-   # For PDF processing capabilities (optional)
-   pip install -e .[pdf]
    ```
 
 3. **Configure Slack**
@@ -247,22 +187,8 @@ GitHub Pages sites           Direct text (code/docs)          Semantic search
    CODE_EMBEDDING_MODEL=microsoft/codebert-base
    ```
 
-5. **Build the knowledge base**
-   ```bash
-   # RECOMMENDED: Use the automated build script with proper Java setup
-   ./build_with_java.sh
-   
-   # OR manually set up environment (if build_with_java.sh doesn't exist):
-   export JAVA_HOME="/opt/homebrew/opt/openjdk"  # macOS with Homebrew
-   export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"
-   export KMP_DUPLICATE_LIB_OK=TRUE
-
-   # Process repositories only (no PDF processing)
-   python scripts/build_knowledge_base.py --config config/repositories.yml
-   
-   # Process both repositories and PDF articles (requires Java + Tika)
-   python scripts/build_knowledge_base.py --config config/repositories.yml --articles-config config/articles.yml
-   ```
+5. **Build the knowledge base and start the MCP server**
+   see `nancy-brain`
 
 7. **Start Nancy**
    ```bash

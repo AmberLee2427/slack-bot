@@ -15,7 +15,7 @@
 
 **No fallback to legacy RAGService or txtai is available.**
 
-All tests and documentation have been updated to reflect this single-backend approach. MCPRAGAdapter is required for all deployments.
+All tests and docs assume MCP only. In this repo the MCP integration tests start a local server on `http://localhost:8123`; they no longer use `MCP_INTEGRATION_TEST` toggles.
 4.  **Execute Conditional Path**:
     
     -   **If Channel Does NOT Exist**:
@@ -51,18 +51,7 @@ slack-bot/
 │   ├── nb4llm/                  # ipynb2txt conversion tool
 │   ├── nancy-brain/             # Modular RAG service
 │   └── slack-machine/           # Slack bot framework
-├── knowledge_base/              # Knowledge base pipeline (managed by `nancy-brain` in v>0.5)
-│   ├── raw/                     # Original repositories and resources
-│   │   ├── microlensing_tools/  # Open source microlensing analysis tools
-│   │   ├── jupyter_notebooks/   # Microlensing analysis notebooks
-│   │   ├── microlens_submit/    # Data challenge submission tool
-│   │   ├── general_tools/       # Roman and general astronomy tools
-│   │   ├── web_resources/       # Microlensing Source and other web content
-│   │   └── journal_articles/    # Microlensing research papers
-│   └── embeddings/              # txtai embeddings database
-│       ├── embeddings.sqlite    # Vector database (txtai default)
-│       ├── config.yml           # txtai configuration
-│       └── models/              # Cached embedding models
+├── knowledge_base/              # Only cached artifacts; pipeline lives in ref/nancy-brain now
 ├── bot/                         # Bot implementation
 │   ├── config/                  # Keys, tokens, cache
 │   ├── home/                    # Slack block kit
@@ -82,90 +71,18 @@ slack-bot/
 Moved to nancy-brain
 ----------------------------------------------------------
 
-## Data Pipeline (v0.2)
+## Knowledge Base Pipeline
 
-### Stage 1: Raw Resources (`knowledge_base/raw/`)
-- **Git repositories**: Cloned microlensing tools, notebooks, documentation sites
-- **PDF articles**: Downloaded from journal/arXiv URLs via `config/articles.yml`
-- **GitHub Pages sites**: Cloned as repositories (e.g., rges-pit.github.io)
-- **Purpose**: Original, unprocessed source material
-
-### Stage 2: Multi-Format Processing
-- **Jupyter notebooks** (`.ipynb`) → converted to plain text via `nb4llm` 
-- **PDF files** → text extraction via Apache Tika (requires Java 8+)
-  - Repository-embedded PDFs automatically discovered and processed
-  - Standalone articles downloaded from URLs in `articles.yml`
-- **Standard text files** → direct processing (.py, .md, .rst, .yml, etc.)
-
-### Stage 3: Dual Embedding Pipeline
-- **General Text Model**: sentence-transformers/all-MiniLM-L6-v2 for documentation and natural language
-- **Code-Specific Model**: microsoft/codebert-base for code files and technical content
-- **Smart Weighting**: File-type-aware scoring (code: 70% code model, mixed: 50/50, docs: 80% general)
-- **Extension-based Weighting**: Configurable via `config/weights.yaml` for relevance optimization
-- **Model Weights**: Individual document scoring stored in `config/model_weights.yaml`
-- **Unified Search**: Merged dual scoring with comprehensive reweighting pipeline
-
-## Technical Architecture (v0.3)
-
-### Dual Embedding System
-- **Two Embedding Indices**: 
-  - `knowledge_base/embeddings/index/` - General model for text/docs
-  - `knowledge_base/embeddings/code_index/` - Code model for technical content
-- **Intelligent Merging**: Weighted mean scoring based on file type detection
-- **Large Candidate Pools**: 50x limit for reweighting effectiveness  
-- **Environment Configuration**: `USE_DUAL_EMBEDDING=true` and `CODE_EMBEDDING_MODEL=microsoft/codebert-base`
-
-### Search Quality Improvements
-- **File Type Categorization**: Automatic detection of code/mixed/docs content
-- **Multi-Model Scoring**: Complementary embeddings provide better coverage
-- **Advanced Reweighting**: Extension weights + model weights + dual scores
-- **GitHub URL Integration**: Direct links to source files included in all results
-
-## Key Components
-
-- **txtai**: Embeddings database for semantic search and RAG
-- **slack-machine**: Slack bot framework with plugin system  
-- **nb4llm**: Jupyter notebook to plain text converter for improved semantic retrieval
-- **Apache Tika** (via tika package): PDF text extraction for journal articles
-- **Unified pipeline**: Single build process handles repositories + PDFs + notebooks
+The KB build and RAG implementation now live entirely in the `ref/nancy-brain` submodule (MCP server). This repo does not own txtai or embedding builds; it consumes the MCP server via `MCPRAGAdapter`.
 
 ----------------------------------------------------------
 ----------------------------------------------------------
 
-## Previous State
+## Current Integration Expectations (Slack bot)
 
-### ✅ **Fully Implemented (v0.3)**
-- **Dual Embedding System**: General + code models with intelligent merging
-- **Complete PDF Processing**: Both repository-embedded and standalone articles
-- **Notebook Conversion**: nb4llm integration preventing duplicates with .nb.txt extension
-- **Multi-Source Indexing**: Repositories, PDFs, and GitHub Pages sites
-- **Advanced Weighting**: File-type detection, extension weights, model weights
-- **Interactive Slack Interface**: Home tab with Block Kit UI and button navigation
-- **Failure Tracking**: Comprehensive pipeline monitoring and reporting
-
-### ✅ **Fully Implemented (v0.4)**
-
-- **GitHub Link Integration**: Replace filenames with clickable links in system messages
-- **Master Branch URLs**: Switch from `/blob/main/` to `/blob/master/` for stability
-- **Implementation**: Modify `get_context_for_query()` and `get_detailed_context()` methods
-- **Timeline**: 1-2 hours
-- **Button Implementation**: Add "Continue Analysis" button to Nancy's responses
-- **Context Preservation**: Maintain conversation state for follow-up expansions
-- **Handler Extension**: Extend `InteractiveHandler` with new button action
-- **Timeline**: 2-3 hours
-- **User Tracking**: Implement per-user daily quota system
-- **Storage Backend**: Redis or SQLite for rate limit persistence
-- **Graceful Limits**: Informative messages when quotas exceeded
-- **Admin Config**: Environment-based limit configuration
-- **Timeline**: 3-4 hours
-
-### 🔧 **Technical Debt and Optimizations**
-
-> Now issues for the Nancy Brain package
-
-- ✅ **Pipeline Modularization**: Refactor scripts into importable package
-- **Embedding Model Updates**: Evaluate newer models for improved retrieval
-- **Chunking Strategy**: Consider document vs. chunk-level embeddings for very large files
+- RAG: MCP only. `MCP_BASE_URL` must point to the MCP server; adapter is required.
+- Tests: integration tests start a local MCP on `http://localhost:8123`; no env toggles required.
+- Knowledge base: built/served by `ref/nancy-brain`; this repo should not rebuild embeddings.
 
 ## Admin Guide: Rate Limiting Management
 
