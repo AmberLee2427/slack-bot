@@ -78,7 +78,7 @@ class MCPRAGAdapter:
 
         # Set authorization header when api_key present
         if api_key:
-            self._session.headers.update({"Authorization": f"Bearer {api_key}"})
+            self._session.headers.update({"X-API-Key": api_key})
         self._session.headers.update({"Content-Type": "application/json"})
 
         # Provide minimal embeddings database interface expected by llm_service/tools

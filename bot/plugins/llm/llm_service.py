@@ -85,7 +85,7 @@ class LLMService:
             health_url = MCP_BASE_URL.rstrip('/') + '/health'
             health_headers = {}
             if MCP_API_KEY:
-                health_headers['Authorization'] = f'Bearer {MCP_API_KEY}'
+                health_headers['X-API-Key'] = MCP_API_KEY
             resp = requests.get(health_url, headers=health_headers, timeout=5)
             if not resp.ok:
                 logger.error("MCP RAG health check failed: %s: %s", resp.status_code, resp.text)
