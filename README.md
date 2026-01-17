@@ -83,6 +83,23 @@ The bot has access to:
 
 ## 🛠️ Setup & Installation
 
+### Docker Deployment (Recommended for Production)
+
+For production deployment with Docker, see **[DOCKER.md](DOCKER.md)** for complete instructions.
+
+**Quick start:**
+```bash
+./setup-docker.sh
+```
+
+This will guide you through:
+- Creating `.env` with your secrets
+- Building embeddings (if needed)
+- Building Docker images
+- Starting both MCP server and Slack bot
+
+### Manual Setup (Development)
+
 ### Prerequisites
 - Python 3.12 or higher
 - Git

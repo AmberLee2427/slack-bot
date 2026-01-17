@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # Nancy Brain MCP Server
+  nancy-brain:
+    build:
+      context: ./ref/nancy-brain
+      dockerfile: Dockerfile
+    container_name: nancy-brain-mcp
+    ports:
+      - "8000:8000"
+    environment:
+      - MCP_PORT=8000
+      - MCP_API_KEY=${MCP_API_KEY}
+      - NB_SECRET_KEY=${NB_SECRET_KEY}
+      - PYTHONUNBUFFERED=1
+      - KMP_DUPLICATE_LIB_OK=TRUE
+    volumes:
+      - ./ref/nancy-brain/config:/app/config:ro
+      - ./ref/nancy-brain/knowledge_base:/app/knowledge_base
+      - nancy-brain-cache:/app/cache
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health').raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - nancy-network
+
+  # Nancy Slack Bot
+  nancy-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nancy-slack-bot
+    ports:
+      - "3000:3000"
+    environment:
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+      - SLACK_APP_TOKEN=${SLACK_APP_TOKEN}
+      - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MCP_BASE_URL=http://nancy-brain:8000
+      - MCP_API_KEY=${MCP_API_KEY}
+      - PYTHONUNBUFFERED=1
+      - KMP_DUPLICATE_LIB_OK=TRUE
+      - PORT=3000
+    volumes:
+      - ./bot/config:/app/bot/config
+    depends_on:
+      nancy-brain:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:3000/health').raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - nancy-network
+
+volumes:
+  nancy-brain-cache:
+    driver: local
+
+networks:
+  nancy-network:
+    driver: bridge
