@@ -168,6 +168,21 @@ class NancyBot:
             logger.error(f"Error handling slash command: {e}")
             return web.Response(status=500)
 
+    async def handle_health(self, request: web.Request) -> web.Response:
+        """Lightweight health endpoint for Docker/ops.
+
+        Returns 200 when the HTTP server is up. Includes best-effort RAG status.
+        """
+        rag_status = getattr(self.llm_service, 'rag_status', None)
+        payload = {
+            "ok": True,
+            "rag": rag_status or {"available": False, "source": "unknown"},
+        }
+        return web.json_response(payload)
+
+    async def handle_root(self, request: web.Request) -> web.Response:
+        return web.Response(text="Nancy Slack Bot")
+
     def _attempt_reconnect(self) -> tuple[bool, str]:
         """Try to (re)connect the LLMService to an MCP-backed RAG adapter.
 
@@ -188,7 +203,7 @@ class NancyBot:
             health_url = MCP_BASE_URL.rstrip('/') + '/health'
             headers = {}
             if MCP_API_KEY:
-                headers['Authorization'] = f'Bearer {MCP_API_KEY}'
+                headers['X-API-Key'] = MCP_API_KEY
             resp = requests.get(health_url, headers=headers, timeout=5)
             if not resp.ok:
                 self.llm_service.rag = None
@@ -218,10 +233,17 @@ async def create_app() -> web.Application:
     """Create the web application"""
     app = web.Application()
     bot = NancyBot()
+
+    # Expose bot instance for optional integrations/tests
+    app["bot"] = bot
     
     app.router.add_post("/slack/events", bot.handle_event)
     app.router.add_post("/slack/interactive", bot.handle_interactive)
     app.router.add_post("/slack/commands", bot.handle_command)
+
+    # Ops endpoints
+    app.router.add_get("/health", bot.handle_health)
+    app.router.add_get("/", bot.handle_root)
     
     return app
 

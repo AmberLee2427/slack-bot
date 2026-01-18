@@ -1,26 +1,27 @@
 """
-This module contains the payload construction for the Gemini API.
+This module contains the LLM service for Nancy using Claude (Anthropic).
 """
 
 import os
 from pathlib import Path
 import yaml
-import requests
 import json
 import re
 import difflib
 from dotenv import load_dotenv
+from anthropic import Anthropic
 
 # environment file 
 env_path = Path("bot/config/.env")
 load_dotenv(env_path)
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")
 DEBUG_LLM = os.environ.get("DEBUG_LLM", "False").lower() in ("true", "1", "yes")
 DAILY_RATE_LIMIT = int(os.environ.get("DAILY_RATE_LIMIT", "100"))  # Default 100 queries per user per day
-GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
-headers = {"Content-Type": "application/json"}
+
+# Initialize Anthropic client
+anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
 
 class LLMService:
     def __init__(
@@ -183,9 +184,17 @@ class LLMService:
             self.indexed_file_map = {}
             return
 
-        all_indexed_docs = list(self.rag.embeddings.database.search("select id, text from txtai"))
-        self.all_indexed_files = [doc['id'] for doc in all_indexed_docs]
-        self.indexed_file_map = {doc['id']: doc['text'] for doc in all_indexed_docs}
+        # Best-effort warmup: MCP can be slow on first boot while loading embeddings.
+        # Nancy should still start and respond in Slack even if this query times out.
+        try:
+            all_indexed_docs = list(self.rag.embeddings.database.search("select id, text from txtai"))
+            self.all_indexed_files = [doc['id'] for doc in all_indexed_docs if doc.get('id')]
+            self.indexed_file_map = {doc['id']: doc.get('text', '') for doc in all_indexed_docs if doc.get('id')}
+        except Exception as e:
+            logger = __import__('logging').getLogger(__name__)
+            logger.warning(f"RAG warmup (embeddings SQL) failed; continuing without file index: {e}")
+            self.all_indexed_files = []
+            self.indexed_file_map = {}
     
     def update_weights(self):
         if self.model_weights_path.exists():
@@ -239,12 +248,13 @@ class LLMService:
             return f"[RAG UNAVAILABLE: {self.rag_status}]\nNo knowledge-base context available."
 
     def construct_query_payload(self, query: str, context: str, conversation_history: list = None) -> dict:
-        # Compose the full prompt
-        full_prompt = f"{self.system_prompt}\n\n"
-        
+        """
+        Construct a payload for Claude API.
+        Returns a dict with 'system' prompt and 'messages' list.
+        """
         # Add conversation history if available
+        messages = []
         if conversation_history:
-            full_prompt += "Recent conversation history (most recent messages leading up to current query):\n"
             for msg in conversation_history:
                 user_id = msg.get("user", "Unknown")
                 text = msg.get("text", "")
@@ -252,17 +262,17 @@ class LLMService:
                 
                 if is_bot:
                     # This is Nancy's previous response
-                    full_prompt += f"Nancy: {text}\n"
+                    messages.append({"role": "assistant", "content": text})
                 else:
                     # This is a user message
                     if user_id.startswith("U"):
-                        full_prompt += f"<@{user_id}>: {text}\n"
+                        messages.append({"role": "user", "content": f"<@{user_id}>: {text}"})
                     else:
-                        full_prompt += f"{user_id}: {text}\n"
-            full_prompt += "\n"
+                        messages.append({"role": "user", "content": f"{user_id}: {text}"})
         
-        full_prompt += (
-            f"You will have {self.max_turns} internalturns to answer the user's question.\n"
+        # Current user query with context
+        user_message = (
+            f"You will have {self.max_turns} internal turns to answer the user's question.\n"
             f"\n"
             f"User query:\n"
             f"{query}\n"
@@ -270,13 +280,12 @@ class LLMService:
             f"Relevant search results:\n"
             f"{context}\n"
         )
-        payload = {
-            "contents": [
-                {"role": "user", "parts": [{"text": full_prompt}]}
-            ]
-        }
+        messages.append({"role": "user", "content": user_message})
 
-        return payload
+        return {
+            "system": self.system_prompt,
+            "messages": messages
+        }
 
     def querry_llm(self, payload: dict, turn: int, user_id: str = None) -> tuple[str, str]:
         import logging
@@ -306,41 +315,37 @@ class LLMService:
                 logger.info(f"✅ User {user_id} rate limit check passed: {used_today}/{used_today + remaining} used")
         
         try:
-            logger.info(f"Making Gemini API request for turn {turn}")
+            logger.info(f"Making Claude API request for turn {turn}")
             if self.debugging:
                 logger.info(f"Request payload: {json.dumps(payload, indent=2)}")
-                
-            response = requests.post(
-                f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
-                headers=headers,
-                json=payload,
-                timeout=30  # Add timeout
+            
+            # Call Claude API using Anthropic SDK
+            response = anthropic_client.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=4096,
+                system=payload["system"],
+                messages=payload["messages"]
             )
 
-            #save payload to file for debugging
-            if self.debugging == True:
+            # Save payload to file for debugging
+            if self.debugging:
                 with open(f"tests/payload_{turn}.json", "w") as f:
                     json.dump(payload, f)
 
-            if response.ok:
-                try:
-                    data = response.json()
-                    if self.debugging:
-                        logger.info(f"Full Gemini response: {json.dumps(data, indent=2)}")
-                    logger.info(f"Gemini API response received for turn {turn}")
-                    llm_text = data['candidates'][0]['content']['parts'][0]['text']
-                    if self.debugging:
-                        logger.info(f"LLM response text: {llm_text}")
-                    assistant_response = f"\n\nTURN {turn+1}:\n\n"
-                    assistant_response += llm_text + "\n"
-                    return llm_text, assistant_response
-                except Exception as e:
-                    logger.error(f"Error processing Gemini response: {e}")
-                    logger.error(f"Response data: {response.text}")
-                    return None, None
+            # Extract text from Claude response
+            if response.content and len(response.content) > 0:
+                llm_text = response.content[0].text
+                if self.debugging:
+                    logger.info(f"Full Claude response: {response}")
+                    logger.info(f"LLM response text: {llm_text}")
+                logger.info(f"Claude API response received for turn {turn}")
+                assistant_response = f"\n\nTURN {turn+1}:\n\n"
+                assistant_response += llm_text + "\n"
+                return llm_text, assistant_response
             else:
-                logger.error(f"Gemini API error: {response.status_code} - {response.text}")
+                logger.error(f"Empty response from Claude API")
                 return None, None
+                
         except Exception as e:
             logger.error(f"Exception in querry_llm: {e}")
             return None, None

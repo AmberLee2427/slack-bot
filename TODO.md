@@ -10,12 +10,12 @@
 - stdio connection between Nancy Brain and Nancy Bot
 - Docker
     - [ ] Slack Bot Docker Setup (root directory)
-        * [ ] Dockerfile for the bot service
-        * [ ] docker-compose.yml connecting bot → MCP server
-        * [ ] Environment variable management
+        * [x] Dockerfile for the bot service
+        * [x] docker-compose.yml connecting bot → MCP server
+        * [x] Environment variable management
     - [ ] API Key Configuration
-        * [ ] Add MCP_API_KEY to both services
-        * [ ] Update MCPRAGAdapter to send auth headers
+        * [x] Add MCP_API_KEY to both services
+        * [x] Update MCPRAGAdapter to send auth headers
 - integrate other MCP servers into the client
 
 ## Aesthetics
@@ -26,7 +26,7 @@
 - more MCP tools (docker them(?) and repackage selected useful tools as internal)
 - Docker
     - [ ] MCP Server Dockerization (in ref/nancy-brain/)
-        * [ ] Create Dockerfile with embeddings build step
-        * [ ] Add /rebuild API endpoint for triggering updates
-        * [ ] Implement simple API key auth middleware
+        * [x] Create Dockerfile with embeddings build step
+        * [x] Add /rebuild API endpoint for triggering updates
+        * [x] Implement simple API key auth middleware
 - live knowledge base udpates through tool calls

@@ -59,8 +59,13 @@ SLACK_BOT_TOKEN=xoxb-your-bot-token
 SLACK_APP_TOKEN=xapp-your-app-token
 SLACK_SIGNING_SECRET=your-signing-secret
 
-# OpenAI
-OPENAI_API_KEY=sk-your-openai-key
+# Claude/Anthropic
+ANTHROPIC_API_KEY=sk-ant-your-anthropic-api-key
+CLAUDE_MODEL=claude-3-5-sonnet-20241022
+
+# Optional
+DAILY_RATE_LIMIT=100
+DEBUG_LLM=False
 ```
 
 ### 3. Start Services
