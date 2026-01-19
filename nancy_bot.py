@@ -48,6 +48,23 @@ class NancyBot:
             self.base_dir,
             self.message_handler,
         )
+
+    def _spawn(self, coro, *, name: str):
+        """Run a coroutine in the background and log exceptions.
+
+        Slack expects a fast HTTP 200 acknowledgement; we should not block request
+        handlers on long-running work (LLM calls, Slack API calls, etc.).
+        """
+        task = asyncio.create_task(coro, name=name)
+
+        def _done(t: asyncio.Task):
+            try:
+                t.result()
+            except Exception as e:
+                logger.error("Background task %s failed: %s", name, e, exc_info=True)
+
+        task.add_done_callback(_done)
+        return task
         
     async def handle_event(self, request: web.Request) -> web.Response:
         """Handle Slack events via HTTP"""
@@ -81,10 +98,10 @@ class NancyBot:
                 logger.info(f"Event received - type: {event_type}, full event: {event}")
                 
                 if event_type == "app_home_opened":
-                    await self.interactive_handler.handle_home_opened(event)
+                    self._spawn(self.interactive_handler.handle_home_opened(event), name="slack:app_home_opened")
                 elif event_type in ["message", "app_mention"]:
                     logger.info(f"Processing message event: {event}")
-                    await self.message_handler.process_message(event)
+                    self._spawn(self.message_handler.process_message(event), name=f"slack:{event_type}")
                 else:
                     logger.warning(f"Unhandled event type: {event_type}")
                     
@@ -110,7 +127,8 @@ class NancyBot:
             payload = json.loads(payload_str)
             logger.info(f"Interactive payload: {payload}")
             
-            await self.interactive_handler.handle_interactive_payload(payload)
+            # ACK immediately; process in background to avoid Slack timeouts
+            self._spawn(self.interactive_handler.handle_interactive_payload(payload), name="slack:interactive")
             
             return web.Response(text="OK")
             

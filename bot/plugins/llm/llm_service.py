@@ -8,6 +8,7 @@ import yaml
 import json
 import re
 import difflib
+import requests
 from dotenv import load_dotenv
 from anthropic import Anthropic
 
