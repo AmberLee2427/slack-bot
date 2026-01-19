@@ -11,11 +11,17 @@ services:
       - MCP_PORT=8000
       - MCP_API_KEY=${MCP_API_KEY}
       - NB_SECRET_KEY=${NB_SECRET_KEY}
+      - NB_USE_LOCAL_SUMMARY=true
       - PYTHONUNBUFFERED=1
       - KMP_DUPLICATE_LIB_OK=TRUE
     volumes:
       - ./ref/nancy-brain/config:/app/config:ro
       - ./ref/nancy-brain/knowledge_base:/app/knowledge_base
+      - ./ref/nancy-brain/connectors:/app/connectors
+      - ./ref/nancy-brain/nancy_brain:/app/nancy_brain
+      - ./ref/nancy-brain/rag_core:/app/rag_core
+      - ./ref/nancy-brain/run_mcp_server.py:/app/run_mcp_server.py
+      - ./ref/nancy-brain/users.db:/app/users.db
       - nancy-brain-cache:/app/cache
     restart: unless-stopped
     healthcheck:
@@ -38,11 +44,16 @@ services:
     environment:
       - MCP_API_KEY=${MCP_API_KEY}
       - NB_SECRET_KEY=${NB_SECRET_KEY}
+      - NB_API_URL=http://nancy-brain:8000
+      - NB_USE_LOCAL_SUMMARY=true
       - PYTHONUNBUFFERED=1
       - KMP_DUPLICATE_LIB_OK=TRUE
     volumes:
       - ./ref/nancy-brain/config:/app/config
       - ./ref/nancy-brain/knowledge_base:/app/knowledge_base
+      - ./ref/nancy-brain/nancy_brain:/app/nancy_brain
+      - ./ref/nancy-brain/rag_core:/app/rag_core
+      - ./ref/nancy-brain/scripts:/app/scripts
       - nancy-brain-cache:/app/cache
     command: streamlit run nancy_brain/admin_ui.py --server.port 8501 --server.address 0.0.0.0 --server.enableCORS false --server.enableXsrfProtection false
     restart: unless-stopped
@@ -59,7 +70,6 @@ services:
       - "3000:3000"
     environment:
       - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
-      - SLACK_APP_TOKEN=${SLACK_APP_TOKEN}
       - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-5-20250929}
@@ -82,6 +92,17 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    networks:
+      - nancy-network
+
+  # Cloudflare Tunnel
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: nancy-tunnel
+    restart: unless-stopped
+    command: tunnel run nancy
+    volumes:
+      - ./cloudflared:/home/nonroot/.cloudflared
     networks:
       - nancy-network
 
