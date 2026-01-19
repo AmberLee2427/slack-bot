@@ -27,6 +27,28 @@ services:
     networks:
       - nancy-network
 
+  # Nancy Brain Web UI
+  nancy-ui:
+    build:
+      context: ./ref/nancy-brain
+      dockerfile: Dockerfile
+    container_name: nancy-brain-ui
+    ports:
+      - "8501:8501"
+    environment:
+      - MCP_API_KEY=${MCP_API_KEY}
+      - NB_SECRET_KEY=${NB_SECRET_KEY}
+      - PYTHONUNBUFFERED=1
+      - KMP_DUPLICATE_LIB_OK=TRUE
+    volumes:
+      - ./ref/nancy-brain/config:/app/config
+      - ./ref/nancy-brain/knowledge_base:/app/knowledge_base
+      - nancy-brain-cache:/app/cache
+    command: streamlit run nancy_brain/admin_ui.py --server.port 8501 --server.address 0.0.0.0 --server.enableCORS false --server.enableXsrfProtection false
+    restart: unless-stopped
+    networks:
+      - nancy-network
+
   # Nancy Slack Bot
   nancy-bot:
     build:
