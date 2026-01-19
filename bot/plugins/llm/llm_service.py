@@ -330,6 +330,7 @@ class LLMService:
 
             # Save payload to file for debugging
             if self.debugging:
+                os.makedirs("tests", exist_ok=True)
                 with open(f"tests/payload_{turn}.json", "w") as f:
                     json.dump(payload, f)
 

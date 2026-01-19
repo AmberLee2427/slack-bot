@@ -34,7 +34,7 @@ class NancyBot:
 
         # Initialize AI services (do NOT instantiate heavy in-process RAG here)
         # LLMService will prefer an MCP adapter when MCP_BASE_URL is set, or accept an injected rag_service.
-        self.llm_service = LLMService(rag_service=None, debugging=True)
+        self.llm_service = LLMService(rag_service=None, debugging=None)
 
         # Initialize handlers
         self.conversation_manager = ConversationManager(self.slack_client)
