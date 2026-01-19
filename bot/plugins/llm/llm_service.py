@@ -559,16 +559,16 @@ class LLMService:
             # --- END RESPONSE tool handler ---
 
             # Add the assistant and user messages to the payload
-            payload["contents"].append(
+            payload["messages"].append(
                 {
                     "role": "assistant", 
-                    "parts": [{"text": assistant_response}]
+                    "content": assistant_response
                 }
             )
-            payload["contents"].append(
+            payload["messages"].append(
                 {
                     "role": "user", 
-                    "parts": [{"text": meta_prompt}]
+                    "content": meta_prompt
                 }
             )
 
@@ -723,16 +723,16 @@ class LLMService:
             # --- END RESPONSE tool handler ---
 
             # Add the assistant and user messages to the payload
-            payload["contents"].append(
+            payload["messages"].append(
                 {
                     "role": "assistant", 
-                    "parts": [{"text": assistant_response}]
+                    "content": assistant_response
                 }
             )
-            payload["contents"].append(
+            payload["messages"].append(
                 {
                     "role": "user", 
-                    "parts": [{"text": meta_prompt}]
+                    "content": meta_prompt
                 }
             )
 
