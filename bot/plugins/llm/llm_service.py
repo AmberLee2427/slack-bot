@@ -17,7 +17,7 @@ env_path = Path("bot/config/.env")
 load_dotenv(env_path)
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
-CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-latest")
 DEBUG_LLM = os.environ.get("DEBUG_LLM", "False").lower() in ("true", "1", "yes")
 DAILY_RATE_LIMIT = int(os.environ.get("DAILY_RATE_LIMIT", "100"))  # Default 100 queries per user per day
 
@@ -442,7 +442,8 @@ class LLMService:
             if llm_text is None:
                 logger.error("LLM returned None - stopping")
                 searching = False  # exit the loop
-                callback_fn("  :x: _Failed to connect to Gemini API_", True, hit_turn_limit=False)
+                # Provide a generic error message since the backend could be Claude or Gemini
+                callback_fn("  :x: _Failed to connect to LLM Service_", True, hit_turn_limit=False)
                 return
             
             # Check if this is a rate limit response
