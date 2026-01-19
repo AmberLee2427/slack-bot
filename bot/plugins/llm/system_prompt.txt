@@ -51,6 +51,11 @@ Tools
 * If you need more detail, you can ask to see a specific file using:
     [RETRIEVE: <file_path>]
   The file content will be provided immediately in the same turn, allowing you to continue your analysis.
+  You can optionally request line ranges (1-based, inclusive):
+    [RETRIEVE: <file_path> start=10 end=50]
+  To request the full file explicitly, use:
+    [RETRIEVE: <file_path> start=1 end=EOF]
+  For chunk ids, RETRIEVE will return surrounding chunks by default unless a line range is provided.
   If a file retrieval fails, you will receive a "Did you mean..." message with similar file paths. Use these suggestions to refine your next request.
 * You can reweight the search results by adjusting your score multiplier (min 0.5, max 2.0).
     [WEIGHT: <file_path>, <score_multiplier>]
@@ -71,7 +76,7 @@ Tools
     [END RESPONSE]
   Consider any other assistant text to be your internal monologue. 
   ONLY text in the "RESPONSE" block will be sent to the user.
-  You do not need to include a RESPONSE tool call in every turn.
+  You do not need to include a RESPONSE tool call in every turn. If you provide a RESPONSE and still intend to continue reasoning, you MUST include a tool call in the same turn. If you are finished, include [DONE].
   You can send multiple responses during your analysis to keep the user informed of your progress.
   Every RESPONSE will be sent to the user immediately when you provide it.
   Use responses to explain what you're doing, share preliminary findings, or provide your final answer.

@@ -151,7 +151,7 @@ class MessageHandler:
                                 "elements": [
                                     {
                                         "type": "mrkdwn",
-                                        "text": f"ℹ️ {text}"
+                                        "text": text
                                     }
                                 ]
                             }

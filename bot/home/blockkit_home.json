@@ -59,6 +59,33 @@
       "type": "section",
       "text": {
         "type": "mrkdwn",
+        "text": "*🧠 Nancy Brain Web UI*\n\nPower users can use the Nancy Brain Knowledge Base directly for advanced search, graph visualization, and filtering."
+      },
+      "accessory": {
+        "type": "button",
+        "text": {
+          "type": "plain_text",
+          "text": "Open Web UI",
+          "emoji": true
+        },
+        "url": "https://nancy-ui.malpas.nz/", 
+        "action_id": "btn_open_ui"
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*🔧 MCP Client Config (Claude / VS Code / Gemini CLI)*\n\nUse Nancy Brain as an MCP tool in your editor. Full examples: <https://github.com/AmberLee2427/nancy-brain/blob/master/examples/mcp-settings.example.json|mcp-settings.example.json>\n\n```json\n{\n  \"mcpServers\": {\n    \"nancy-brain\": {\n      \"command\": \"npx\",\n      \"args\": [\n        \"-y\",\n        \"@modelcontextprotocol/server-sse\",\n        \"--url\", \"https://your-server/sse\",\n        \"--api-key\", \"$MCP_API_KEY\"\n      ]\n    }\n  }\n}\n```"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
         "text": "*🔍 Explore My Knowledge Base*"
       }
     },

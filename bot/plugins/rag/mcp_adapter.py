@@ -95,9 +95,13 @@ class MCPRAGAdapter:
             results = payload.get("hits") or payload.get("results") or payload.get("rows") or []
             normalized = []
             for r in results:
+                data = r.get("data") if isinstance(r.get("data"), dict) else {}
                 normalized.append({
                     "id": r.get("id") or r.get("doc_id"),
+                    "source_document": r.get("source_document") or data.get("source_document"),
                     "text": r.get("text", ""),
+                    "summary": r.get("summary") or data.get("summary"),
+                    "data": data,
                     "score": float(r.get("score", 0.0)),
                     "extension_weight": float(r.get("extension_weight", 1.0)),
                     "model_score": float(r.get("model_score", 1.0)),
@@ -142,4 +146,30 @@ class MCPRAGAdapter:
             self._logger.debug("Failed to fetch github url via retrieve for %s", doc_id)
 
         return None
+
+    def retrieve(self, doc_id: str, start: Optional[int] = None, end: Optional[int] = None, window: Optional[int] = None) -> dict:
+        """Retrieve a document passage via MCP HTTP API.
+
+        Args:
+            doc_id: Document identifier (may include chunk suffix)
+            start: 1-based start line (inclusive), optional
+            end: 1-based end line (inclusive), optional
+            window: chunk window size for chunk ids (optional)
+        """
+        url = f"{self.base_url}/retrieve"
+        payload = {"doc_id": doc_id}
+        if start is not None:
+            payload["start"] = start
+        if end is not None:
+            payload["end"] = end
+        if window is not None:
+            payload["window"] = window
+        try:
+            resp = self._session.post(url, json=payload, timeout=self.timeout)
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("passage") or data
+        except Exception as exc:
+            self._logger.error("MCP retrieve failed: %s", exc)
+            raise MCPAdapterError(exc)
 

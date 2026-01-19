@@ -14,6 +14,29 @@ def search_tool(self, llm_text: str, callback_fn=None) -> str:
     It extracts the search query from the LLM response and updates the meta prompt.
     """
     meta_prompt = ""
+
+    def _strip_chunk_suffix(doc_id: str) -> str:
+        return re.sub(r"::chunk-\d+$", "", doc_id or "")
+
+    def _get_summary_for_result(result: dict) -> str | None:
+        # Prefer summary provided by the backend
+        summary = result.get("summary")
+        if summary:
+            return summary
+
+        # If the result is itself a summary document, use its text
+        doc_id = result.get("id") or ""
+        if doc_id.startswith("summaries/"):
+            return result.get("text", "")
+
+        # Try to map to summaries/{source_document} from the local index map
+        base_doc_id = result.get("source_document") or _strip_chunk_suffix(doc_id)
+        if base_doc_id:
+            summary_doc_id = f"summaries/{base_doc_id}"
+            if summary_doc_id in getattr(self, "indexed_file_map", {}):
+                return self.indexed_file_map.get(summary_doc_id)
+
+        return None
     lines = llm_text.splitlines()
     for line in lines:
         if "SEARCH:" in line:
@@ -43,6 +66,7 @@ def search_tool(self, llm_text: str, callback_fn=None) -> str:
             meta_prompt += f"\n\nSearch results:\n{query_part}\n"
             for i, result in enumerate(results, 1):
                 github_url = self.rag._get_github_url(result['id'])
+                data = result.get("data") if isinstance(result.get("data"), dict) else {}
                 if github_url:
                     slack_link = f"<{github_url}|{Path(result['id']).name}>"
                     meta_prompt += f"\n\nResult {i}:\n"
@@ -50,11 +74,26 @@ def search_tool(self, llm_text: str, callback_fn=None) -> str:
                 else:
                     meta_prompt += f"\n\nResult {i}:\n"
                     meta_prompt += f"  File: {result['id']}\n"
+                if data:
+                    line_start = data.get("line_start")
+                    line_end = data.get("line_end")
+                    chunk_index = data.get("chunk_index")
+                    chunk_count = data.get("chunk_count")
+                    if line_start is not None and line_end is not None:
+                        meta_prompt += f"  Lines: {line_start}-{line_end}\n"
+                    if chunk_index is not None and chunk_count is not None:
+                        meta_prompt += f"  Chunk: {int(chunk_index) + 1}/{chunk_count}\n"
                 meta_prompt += f"  Score: {result.get('score', 0.0):.3f}\n"
                 meta_prompt += f"  Extension weight: {result.get('extension_weight', 1.0):.3f}\n"
                 meta_prompt += f"  Model weight: {result.get('model_score', 1.0):.3f}\n"
                 meta_prompt += f"  Final score: {result.get('adjusted_score', result.get('score', 0.0)):.3f}\n"
                 meta_prompt += f"  Content length: {len(result['text'])} chars\n"
+                summary_text = _get_summary_for_result(result)
+                if summary_text:
+                    summary_text = summary_text.strip()
+                    if len(summary_text) > 600:
+                        summary_text = summary_text[:600] + "..."
+                    meta_prompt += f"  Summary: {summary_text}\n"
                 meta_prompt += f"  Content: {result['text']}"
 
     return meta_prompt
@@ -119,7 +158,82 @@ def retrieve_tool(self, file_path: str, context_files: set) -> tuple[str, set]:
     meta_prompt = ""
     new_context_files = set()
 
+    def _parse_retrieve_spec(spec: str):
+        parts = spec.split()
+        if not parts:
+            return None, None, None, None
+        path = parts[0]
+        start = None
+        end = None
+        window = None
+        for tok in parts[1:]:
+            if tok.startswith("start="):
+                try:
+                    start = int(tok.split("=", 1)[1])
+                except Exception:
+                    pass
+            elif tok.startswith("end="):
+                val = tok.split("=", 1)[1]
+                if val.lower() in ("eof", "full", "all"):
+                    end = None
+                else:
+                    try:
+                        end = int(val)
+                    except Exception:
+                        pass
+            elif tok.startswith("lines="):
+                val = tok.split("=", 1)[1]
+                if "-" in val:
+                    try:
+                        start_str, end_str = val.split("-", 1)
+                        start = int(start_str)
+                        end = int(end_str)
+                    except Exception:
+                        pass
+            elif tok.startswith("window="):
+                try:
+                    window = int(tok.split("=", 1)[1])
+                except Exception:
+                    pass
+            elif re.match(r"^\d+-\d+$", tok):
+                try:
+                    start_str, end_str = tok.split("-", 1)
+                    start = int(start_str)
+                    end = int(end_str)
+                except Exception:
+                    pass
+        return path, start, end, window
+
     # Exact match in indexed files
+    # Try MCP retrieve if available
+    if getattr(self, "rag", None) and hasattr(self.rag, "retrieve"):
+        try:
+            spec_path, start, end, window = _parse_retrieve_spec(file_path)
+            if spec_path:
+                file_path = spec_path
+            passage = self.rag.retrieve(file_path, start=start, end=end, window=window)
+            if passage:
+                github_url = passage.get("github_url") or self.rag._get_github_url(file_path)
+                file_content = passage.get("text", "")
+                if github_url:
+                    slack_link = f"<{github_url}|{Path(file_path).name}>"
+                    file_content += f"\n\nGitHub URL: {slack_link}"
+                line_start = passage.get("start") or passage.get("line_start")
+                line_end = passage.get("end") or passage.get("line_end")
+                total_lines = passage.get("total_lines")
+                if line_start is not None or line_end is not None:
+                    range_text = f"Lines: {line_start}-{line_end if line_end is not None else 'EOF'}"
+                    if total_lines:
+                        range_text += f" / {total_lines}"
+                    meta_prompt += f"\n\nRetrieved file: {file_path}\n{range_text}\nFile content:\n{file_content}"
+                else:
+                    meta_prompt += f"\n\nRetrieved file: {file_path}\nFile content:\n{file_content}"
+                new_context_files.add(file_path)
+                return meta_prompt, new_context_files
+        except Exception:
+            # Fall back to local index below
+            pass
+
     matching_chunks = [doc_id for doc_id in self.all_indexed_files if doc_id == file_path]
     if matching_chunks:
         for chunk_id in matching_chunks:

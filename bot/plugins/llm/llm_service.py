@@ -28,7 +28,7 @@ class LLMService:
     def __init__(
             self, 
             system_prompt: Path = None, 
-            max_turns: int = 5, 
+            max_turns: int = 10, 
             model_weights_path: Path = None,
             debugging: bool = None,  # Use None to read from env
             no_of_retrievals: int = 5,
@@ -572,14 +572,6 @@ class LLMService:
                 }
             )
 
-            # Exit the loop if the agent has no more requests
-            if "SEARCH:" not in llm_text \
-                and "RETRIEVE:" not in llm_text \
-                    and "TREE:" not in llm_text \
-                        and "WEIGHT:" not in llm_text \
-                            and "RESPONSE" in llm_text:
-                searching = False
-
             # Exit the loop if the agent has requested it
             if "[DONE]" in llm_text:
                 searching = False
@@ -589,9 +581,9 @@ class LLMService:
 
             turn += 1
 
-        # If we finished without a response, send a fallback
-        if searching == False and turn >= self.max_turns:
-            callback_fn("  :warning: _Reached thinking limit - providing available results_", True, hit_turn_limit=True)
+        # If we finished without a response (searching is still True means we hit the limit)
+        if searching:
+            callback_fn("  :warning: _Thinking limit reached - providing current analysis_", True, hit_turn_limit=True)
         
         # Update thread context cache with files Nancy looked at in this session
         if thread_ts and context_files:
