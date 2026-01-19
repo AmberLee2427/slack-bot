@@ -13,7 +13,7 @@ def test_mcp_health_endpoint_live(mcp_server):
 
 
 def test_mcp_adapter_round_trip(mcp_server):
-    adapter = MCPRAGAdapter(MCP_BASE_URL, timeout=15)
+    adapter = MCPRAGAdapter(MCP_BASE_URL, api_key="test-key", timeout=15)
 
     results = adapter.search("microlensing", limit=3)
     assert results, "Expected search results from MCP server"

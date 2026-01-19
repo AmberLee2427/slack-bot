@@ -37,6 +37,9 @@ def mcp_server():
     env = os.environ.copy()
     env["MCP_BASE_URL"] = MCP_BASE_URL
     env["MCP_PORT"] = str(MCP_PORT)
+    # Set a known API key for testing auth
+    env["MCP_API_KEY"] = "test-key"
+
     os.environ["MCP_BASE_URL"] = MCP_BASE_URL
     os.environ["MCP_PORT"] = str(MCP_PORT)
 

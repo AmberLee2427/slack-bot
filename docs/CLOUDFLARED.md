@@ -68,6 +68,12 @@ And locally:
 - `docker-compose logs -f nancy-bot`
 Then mention `@Nancy hello` in Slack; you should see `/slack/events` traffic.
 
+## 7) Make it stop dying (recommended)
+On macOS, run it as a service so it survives terminal closes:
+
+If installed via Homebrew: `brew services start cloudflare/cloudflare/cloudflared`
+It will use your `config.yml`.
+
 ## About “public nancy-brain for custom GPTs”
 You *can* expose it, but it still runs on your hardware (so it’s still “on your dime” in compute). What you can do:
 - Require an API key (already supported by MCP endpoints; keep `MCP_API_KEY` strong)
