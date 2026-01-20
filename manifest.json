@@ -22,6 +22,12 @@
                "url": "https://your-host.example.com/slack/commands",
                "description": "Show RAG / MCP health and optionally reconnect (usage: /status reconnect)",
                "usage_hint": "[reconnect]"
+           },
+           {
+               "command": "/mcp_api_key",
+               "url": "https://your-host.example.com/slack/commands",
+               "description": "Issue a per-user Nancy Brain MCP API key",
+               "usage_hint": ""
            }
        ],
     "oauth_config": {

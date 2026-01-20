@@ -131,7 +131,7 @@
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "*🚀 Quick Commands*\n\n• `@nancy my quota` - Check your daily usage\n• `@nancy help` - Get general assistance\n• 🍳 *Keep Cooking* button - Get deeper analysis when I finish a response\n• Just ask questions naturally - I'll search my knowledge base automatically!"
+        "text": "*🚀 Quick Commands*\n\n• `/mcp_api_key` - Get your Nancy Brain MCP API key\n• `@nancy my quota` - Check your daily usage\n• `@nancy help` - Get general assistance\n• 🍳 *Keep Cooking* button - Get deeper analysis when I finish a response\n• Just ask questions naturally - I'll search my knowledge base automatically!"
       }
     }
   ]

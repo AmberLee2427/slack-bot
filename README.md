@@ -81,6 +81,26 @@ The bot has access to:
 - **Knowledge base:** Built/maintained in `ref/nancy-brain`; this repo does not build embeddings.
 - **Tests:** Auto-start a local MCP server on `http://localhost:8123`.
 
+## 🔑 MCP API Keys (nancy-brain)
+
+Nancy Brain issues per-user MCP keys via an invite-code endpoint. Keep invite codes in your `.env` (not in git).
+
+```bash
+MCP_INVITE_CODES=code1,code2,code3
+```
+
+Issue a key:
+```bash
+curl -X POST https://nancy-brain.malpas.nz/v2/api-keys/request \
+  -H "Content-Type: application/json" \
+  -d '{"invite_code":"code1","contact":"you@example.com"}'
+```
+
+Use the key:
+```bash
+curl -H "X-API-Key: <key>" "https://nancy-brain.malpas.nz/search?query=roman&limit=3"
+```
+
 ## 🛠️ Setup & Installation
 
 ### Docker Deployment (Recommended for Production)

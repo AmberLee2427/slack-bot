@@ -83,3 +83,39 @@ async def test_status_reconnect_triggers_recheck(app_client):
 
     assert resp.status == 200
     assert "reconnected" in body.get("text", "")
+
+
+@pytest.mark.asyncio
+async def test_mcp_api_key_issues_key(app_client, monkeypatch):
+    monkeypatch.setenv("MCP_BASE_URL", "http://mcp.test")
+    monkeypatch.setenv("MCP_API_KEY", "admin-key")
+
+    import nancy_bot as nancy_mod
+
+    class DummyResponse:
+        def __init__(self, status_code, payload):
+            self.status_code = status_code
+            self._payload = payload
+            self.text = ""
+
+        @property
+        def ok(self):
+            return 200 <= self.status_code < 300
+
+        def json(self):
+            return self._payload
+
+    def fake_post(url, json=None, headers=None, timeout=None):
+        assert url == "http://mcp.test/v2/api-keys/issue"
+        assert headers == {"X-API-Key": "admin-key"}
+        return DummyResponse(200, {"api_key": "nb_test_key"})
+
+    monkeypatch.setattr(nancy_mod.requests, "post", fake_post)
+
+    data = {"command": "/mcp_api_key", "user_id": "U123", "text": ""}
+
+    resp = await post_form(app_client, data)
+    body = await resp.json()
+
+    assert resp.status == 200
+    assert "nb_test_key" in body.get("text", "")

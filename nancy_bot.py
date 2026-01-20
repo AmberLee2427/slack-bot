@@ -147,7 +147,7 @@ class NancyBot:
 
             logger.info(f"Slash command received: {command} text={text} user={user_id}")
 
-            # Only implement /status for now
+            # Status/health check
             if command == '/status' or command == '/health':
                 # If user asked to reconnect, attempt a hot-reconnect
                 if text.lower() == 'reconnect':
@@ -178,6 +178,52 @@ class NancyBot:
                     "text": resp_text
                 }
                 return web.json_response(payload)
+
+            if command in ("/mcp_api_key", "/mcp-api-key"):
+                mcp_base_url = os.environ.get("MCP_BASE_URL", "").strip()
+                mcp_admin_key = os.environ.get("MCP_API_KEY", "").strip()
+                if not mcp_base_url:
+                    resp_text = "⚠️ MCP_BASE_URL is not configured on the bot."
+                    return web.json_response({"response_type": "ephemeral", "text": resp_text})
+                if not mcp_admin_key:
+                    resp_text = "⚠️ MCP_API_KEY is not configured on the bot."
+                    return web.json_response({"response_type": "ephemeral", "text": resp_text})
+
+                issue_url = f"{mcp_base_url.rstrip('/')}/v2/api-keys/issue"
+                payload = {"contact": f"slack:{user_id}", "label": "slack"}
+                try:
+                    resp = requests.post(
+                        issue_url,
+                        json=payload,
+                        headers={"X-API-Key": mcp_admin_key},
+                        timeout=10,
+                    )
+                    if resp.ok:
+                        data = resp.json()
+                        api_key = data.get("api_key")
+                        if api_key:
+                            resp_text = (
+                                "Here is your Nancy Brain MCP API key:\n"
+                                f"`{api_key}`\n"
+                                "Use it as an `X-API-Key` header."
+                            )
+                        else:
+                            resp_text = "⚠️ Key issuance succeeded but no key was returned."
+                    else:
+                        detail = ""
+                        try:
+                            detail = resp.json().get("detail", "")
+                        except Exception:
+                            detail = resp.text.strip()
+                        if detail:
+                            resp_text = f"⚠️ Key issuance failed: {detail}"
+                        else:
+                            resp_text = "⚠️ Key issuance failed."
+                except Exception as e:
+                    logger.error("Error issuing MCP API key: %s", e, exc_info=True)
+                    resp_text = "⚠️ Failed to contact nancy-brain for key issuance."
+
+                return web.json_response({"response_type": "ephemeral", "text": resp_text})
 
             # Unknown command
             return web.Response(status=404, text="Unknown command")
