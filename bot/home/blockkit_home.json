@@ -48,29 +48,27 @@
       "elements": [
         {
           "type": "mrkdwn",
-          "text": "💡 *Usage Tips:* • Type `@nancy my quota` in any channel • Quotas reset at midnight UTC • Use 🍳 Keep Cooking for deeper analysis • Contact admin if you need more queries"
+          "text": "💡 *Usage Tips:* • Type `@nancy my quota` in any channel • Quotas reset at midnight UTC • Use 🍳 Keep Cooking for deeper analysis\nContact admin if you need more queries or talk for longer on my customGPT."
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+          "text": "NancyGPT",
+            "emoji": true
+          },
+          "url": "https://chatgpt.com/g/g-68a9ed2774fc819189474563060e76f4-nancy",
+          "action_id": "btn_open_custom_gpt"
         }
       ]
     },
     {
       "type": "divider"
-    },
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "*🧠 Nancy Brain Web UI*\n\nPower users can use the Nancy Brain Knowledge Base directly for advanced search, graph visualization, and filtering."
-      },
-      "accessory": {
-        "type": "button",
-        "text": {
-          "type": "plain_text",
-          "text": "Open Web UI",
-          "emoji": true
-        },
-        "url": "https://nancy-ui.malpas.nz/", 
-        "action_id": "btn_open_ui"
-      }
     },
     {
       "type": "section",
@@ -131,7 +129,7 @@
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "*🚀 Quick Commands*\n\n• `/mcp_api_key` - Get your Nancy Brain MCP API key\n• `@nancy my quota` - Check your daily usage\n• `@nancy help` - Get general assistance\n• 🍳 *Keep Cooking* button - Get deeper analysis when I finish a response\n• Just ask questions naturally - I'll search my knowledge base automatically!"
+        "text": "*🚀 Quick Commands*\n\n• `/mcp_api_key` - Get your Nancy Brain MCP API key\n• *Custom GPT*: https://chatgpt.com/g/g-68a9ed2774fc819189474563060e76f4-nancy\n• `@nancy my quota` - Check your daily usage\n• `@nancy help` - Get general assistance\n• 🍳 *Keep Cooking* button - Get deeper analysis when I finish a response\n• Just ask questions naturally - I'll search my knowledge base automatically!"
       }
     }
   ]
