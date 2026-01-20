@@ -153,6 +153,7 @@ config/model_weights.yaml  # Dynamic learning weights from Nancy's WEIGHT: tool
 .env
 ref/arXiv-2510.18234v1
 *GEMINI.md
+cloudflared/
 
 # VSCode workspace
 *.code-workspace
