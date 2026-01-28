@@ -49,7 +49,7 @@ if [ ! -d "ref/nancy-brain/knowledge_base/embeddings" ] || [ -z "$(ls -A ref/nan
     python -m nancy_brain.cli build config/repositories.yml knowledge_base || {
         echo "❌ Failed to build embeddings"
         echo "   Make sure you have:"
-        echo "   - Python 3.11+ installed"
+        echo "   - Python 3.12+ installed"
         echo "   - nancy-brain dependencies installed (pip install -e .)"
         echo "   - config/repositories.yml configured"
         exit 1

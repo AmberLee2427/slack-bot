@@ -5,7 +5,7 @@
 ### Task 1: MCP Server Dockerization ✅
 
 - [x] Created `ref/nancy-brain/Dockerfile`
-  - Python 3.11 base image
+  - Python 3.12 base image
   - All dependencies installed
   - Proper directory structure
   - Health check configured

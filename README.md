@@ -105,7 +105,7 @@ curl -H "X-API-Key: <key>" "https://nancy-brain.malpas.nz/search?query=roman&lim
 
 ### Docker Deployment (Recommended for Production)
 
-For production deployment with Docker, see **[DOCKER.md](DOCKER.md)** for complete instructions.
+For production deployment with Docker, see **[DOCKER.md](docs/DOCKER.md)** for complete instructions.
 
 **Quick start:**
 ```bash

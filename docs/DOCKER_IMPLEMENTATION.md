@@ -11,7 +11,7 @@
 - `build_docker.sh` - Helper script for building the image
 
 **Features Implemented:**
-- Python 3.11 base image with all dependencies
+- Python 3.12 base image with all dependencies
 - Embeddings baked into image (or mounted via volume)
 - HTTP API on port 8000
 - Health check endpoint
