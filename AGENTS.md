@@ -1,8 +1,8 @@
 # AI Agents Guide: Roman Galactic Exoplanet Survey Slack Bot
 
-## MCP Adapter Backend (v0.5+)
+## MCP Adapter Backend (v0.4.x baseline)
 
-**As of v0.5, Nancy uses the MCPRAGAdapter as the *sole* supported RAG backend.**
+**As of v0.4.x, Nancy uses the MCPRAGAdapter as the *sole* supported RAG backend.**
 
 - All legacy fallback logic and the old RAGService are removed.
 - MCP configuration is required for all knowledge-base and RAG features.
@@ -15,7 +15,7 @@
 
 **No fallback to legacy RAGService or txtai is available.**
 
-All tests and docs assume MCP only. In this repo the MCP integration tests start a local server on `http://localhost:8123`; they no longer use `MCP_INTEGRATION_TEST` toggles.
+All tests and docs assume MCP only. In this repo, MCP integration tests start a local server on `http://localhost:8123` without `MCP_INTEGRATION_TEST` toggles.
 4.  **Execute Conditional Path**:
     
     -   **If Channel Does NOT Exist**:
@@ -217,77 +217,32 @@ export DAILY_RATE_LIMIT=200
 
 ---
 
-## MCP Adapter Refactor Plan (v0.5)
+## v0.5.0 Implementation Plan
 
 Purpose
 -------
-Add a small adapter layer so the bot can call a running MCP server (local or remote) using the exact same surface the code expects from the current `RAGService`. This minimizes code changes in `bot/plugins/llm` and allows a staged rollout with a fallback to the existing local RAG implementation.
+`v0.4.x` established the MCP-only architecture and Docker deployment baseline.
+`v0.5.0` focuses on beta-readiness, reliability, and clearer operational UX.
 
-Quick checklist (hand-off friendly)
-----------------------------------
-- [x] Create `bot/plugins/rag/mcp_adapter.py` implementing the adapter contract below
-- [x] Wire `bot/plugins/llm/llm_service.py` to instantiate `MCPRAGAdapter` when `MCP_BASE_URL` is present
-- [ ] Add unit tests: `tests/test_mcp_adapter.py` (mock MCP responses)
-- [ ] Add integration/smoke test gated by env var `MCP_INTEGRATION_TEST=true`
-- [x] Add `.env` keys to `bot/config/.env.example`: `MCP_BASE_URL`, `MCP_API_KEY`
+Completed in v0.4.x
+-------------------
+- [x] `MCPRAGAdapter` implemented in `bot/plugins/rag/mcp_adapter.py`
+- [x] `LLMService` wired to MCP-only backend in `bot/plugins/llm/llm_service.py`
+- [x] Unit tests for adapter behavior in `tests/test_mcp_adapter.py`
+- [x] Slash-command tests for `/status` and `/mcp_api_key` in `tests/test_slash_command_handler.py`
+- [x] Integration tests auto-start local MCP in `tests/conftest.py`
+- [x] `/status` slash command registered in `manifest.json`
 
-Additional immediate work (v0.5 - health/status & tests)
------------------------------------------------
-- [ ] Update Slack home view to include a RAG health block showing `LLMService.rag_status` and last-checked time. Implement dynamic injection in `InteractiveHandler.handle_home_opened`.
-- [ ] Add a periodic background re-check (best-effort): small async task that polls MCP `/health` every N seconds (configurable), updates `LLMService.rag_status`, and triggers a home-view refresh when status changes.
-- [ ] Add unit tests that simulate Slack slash command POSTs to `/slack/commands` (form-encoded). Place tests in `tests/test_slash_command_handler.py` and use aiohttp test utilities to call `NancyBot.handle_command`.
-- [ ] Add integration/smoke test gated by env var `MCP_INTEGRATION_TEST=true` which will POST to a running MCP server and validate end-to-end reconnect flow.
+Remaining for v0.5.0
+--------------------
+- [ ] Add RAG health block injection into App Home (`InteractiveHandler.handle_home_opened`)
+- [ ] Add periodic MCP `/health` re-check task and refresh App Home on status change
+- [ ] Improve reconnect/health diagnostics for operators (timestamps + failure reason history)
+- [ ] Validate NancyGPT + Actions with live hosted MCP and document working setup
+- [ ] Resolve outstanding MCP tool reliability issues (retrieve/tree/search edge cases)
 
-Notes on Slack registration and manifest
---------------------------------------
-- Add the `/status` slash command to the Slack app manifest (see `manifest.json`), pointing to the bot's `/slack/commands` endpoint. The command should be ephemeral by default and accept an optional `reconnect` argument.
-
-Testing locally
----------------
-- To simulate Slack during tests, send an application/x-www-form-urlencoded POST with fields `command`, `user_id`, and optional `text` to `/slack/commands` (the repository tests will cover this).
-
-Priority
---------
-1. Unit tests for slash command (fast feedback)
-2. Home view health injection and publish (UI visible)
-3. Periodic background poll + optional presence/emoji update
-4. Integration test gated by env var and manifest changes
-
-Adapter contract (minimal API)
-------------------------------
-- Class: MCPRAGAdapter(base_url: str, api_key: Optional[str] = None, fallback: Optional[RAGService] = None)
-  - search(query: str, limit: int = 5) -> list[dict]
-    - returns items: {id: str, text: str, score: float, extension_weight: float, model_score: float, adjusted_score: float}
-  - get_context_for_query(query: str) -> str
-  - _get_github_url(doc_id: str) -> Optional[str]
-  - embeddings.database.search(sql: str) -> list[dict]  # maintains current SQL usage in tools.py
-  - Behavior: normalize MCP responses, raise clear exceptions for network/auth issues, and allow optional fallback to local RAG
-
-Files to add / update
----------------------
-- Add: `bot/plugins/rag/mcp_adapter.py` (adapter implementation + lightweight `EmbeddingsDB` wrapper)
-- Update: `bot/plugins/llm/llm_service.py` (instantiate adapter when configured; keep `rag_service` injection working)
-- Update: `bot/plugins/llm/tools.py` tests to mock adapter behavior
-- Add tests: `tests/test_mcp_adapter.py`, update existing llm tests to use adapter mocks
-
-Testing and rollout notes
--------------------------
-- Unit tests should mock the MCP endpoints and validate that adapter normalizes fields used by `tools.py` and `llm_service.py`.
-- Add an env-gated integration test that runs against a dev MCP server (`MCP_INTEGRATION_TEST=true`) — keep it opt-in for CI.
-- Default behavior: if `MCP_BASE_URL` unset or adapter fails on startup, fall back to local `RAGService` and log a warning.
-
-Environment variables
----------------------
-- `MCP_BASE_URL` — base URL of running MCP server (optional)
-- `MCP_API_KEY` — API key / bearer token for MCP (optional)
-- `MCP_TIMEOUT` — adapter HTTP timeout in seconds (default 5)
-
-Estimated effort
-----------------
-- Adapter + unit tests: 0.5 - 1.5 days
-- Wiring `llm_service.py` + smoke tests: 0.5 day
-- Integration tests + staged rollout validation: 0.5 - 1 day
-
-Handoff pointer
----------------
-If you pick this up, begin by implementing `MCPRAGAdapter.search()` and `get_context_for_query()` as mocked endpoints and update `llm_service.py` to instantiate the adapter only when `MCP_BASE_URL` is present. Run unit tests and then enable the integration test if a dev MCP server is available.
+Testing notes
+-------------
+- MCP integration tests run against local `http://localhost:8123` via `tests/conftest.py`.
+- Slack command tests use form-encoded POSTs to `/slack/commands`.
+- Keep `MCP_BASE_URL` and `MCP_API_KEY` configured for local manual testing.

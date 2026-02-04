@@ -12,25 +12,14 @@ How it works:
 > AKA: Nancy
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-   Create `bot/config/.env` with your tokens:
-   ```env
-   # Slack Configuration
-   SLACK_BOT_TOKEN=xoxb-your-bot-token-from-step-4
-   SLACK_SIGNING_SECRET=your-signing-secret-from-slack-app
-   
-   # LLM Configuration  
-   GEMINI_API_KEY=your-gemini-api-key
-   GEMINI_MODEL=gemini-2.0-flash-lite
-   
-   # Logging
-   LOG_LEVEL=INFO
-   DEBUG_LLM=True
-   
-   # Knowledge Base
-   KNOWLEDGE_BASE_PATH=knowledge_base/embeddings
-   ```/opensource.org/licenses/MIT)
 
 An intelligent Slack bot designed to support participants in the **Roman Galactic Exoplanet Survey - Project Infrastructure Team data challenge**. This bot leverages advanced AI techniques to provide context-aware assistance with microlensing analysis, data challenge procedures, and related tools.
+
+## 📌 Release Status
+
+- Current package version: `0.4.1` (`pyproject.toml`)
+- `v0.4.x` baseline is complete: Dockerized bot+MCP deployment, MCP API key auth, MCP-only RAG adapter wiring.
+- Next implementation target: `v0.5.0` (beta hardening and production-readiness work).
 
 ## 🎯 Purpose
 
@@ -60,7 +49,7 @@ The bot has access to:
 - **Research papers** and journal articles on microlensing
 - **Web resources** from Microlensing Source and related sites
 
-**Note:** As of v0.5, Nancy uses the MCPRAGAdapter as the *sole* supported RAG backend. The legacy RAGService and txtai-based backends are no longer supported or present in the codebase. MCP configuration is required for all knowledge-base features.
+**Note:** In the `v0.4.x` baseline, Nancy already uses `MCPRAGAdapter` as the sole supported RAG backend. Legacy `RAGService`/txtai fallback is not supported in this repo. MCP configuration is required for all knowledge-base features.
 
 ### 🔧 Technical Capabilities
 - **Semantic search** via MCPRAGAdapter (MCP server required)
@@ -205,23 +194,23 @@ This will guide you through:
 
 4. **Create configuration**
    Edit/Create `bot/config/.env`:
-   ```python
+   ```env
    # LLM Configuration
-   GEMINI_API_KEY = "your-api-key""
-   GEMINI_MODEL = "gemini-2.0-flash-lite"
+   ANTHROPIC_API_KEY=your-api-key
+   CLAUDE_MODEL=claude-3-5-sonnet-latest
 
    # Nancy Bot Configuration
    SLACK_BOT_TOKEN="xoxb-your-bot-token"
    SLACK_SIGNING_SECRET="your-signing-secret"
+   MCP_BASE_URL="http://localhost:8000"
+   MCP_API_KEY="your-mcp-api-key"
 
    # Logging
    LOG_LEVEL=INFO
    DEBUG_LLM=False
 
-   # Knowledge Base
-   KNOWLEDGE_BASE_PATH=knowledge_base/embeddings
-   USE_DUAL_EMBEDDING=true
-   CODE_EMBEDDING_MODEL=microsoft/codebert-base
+   # Optional rate limit
+   DAILY_RATE_LIMIT=100
    ```
 
 5. **Build the knowledge base and start the MCP server**
@@ -237,8 +226,7 @@ This will guide you through:
    ```
    Starting Nancy Bot...
    Nancy Bot ready on http://0.0.0.0:3000
-   Loading embeddings from knowledge_base/embeddings/index
-   Embeddings loaded successfully
+   Using MCPRAGAdapter pointing to http://localhost:8000 (health OK)
    ```
 
 ### 🚨 Troubleshooting Setup

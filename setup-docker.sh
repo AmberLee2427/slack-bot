@@ -31,9 +31,8 @@ if [ ! -f .env ]; then
     echo "   - MCP_API_KEY (generate a random key)"
     echo "   - NB_SECRET_KEY (generate a random key)"
     echo "   - SLACK_BOT_TOKEN"
-    echo "   - SLACK_APP_TOKEN"
     echo "   - SLACK_SIGNING_SECRET"
-    echo "   - OPENAI_API_KEY"
+    echo "   - ANTHROPIC_API_KEY"
     echo ""
     read -p "Press Enter after you've filled in .env..."
 fi

@@ -17,11 +17,11 @@
     - Dylan wants me to use the audiobook tunnel already forwarding to the lenovo and set it up on the website
     - can I host the nancy-brain UI without it being a security problem?
 - Docker
-    - [ ] Slack Bot Docker Setup (root directory)
+    - [x] Slack Bot Docker Setup (root directory)
         * [x] Dockerfile for the bot service
         * [x] docker-compose.yml connecting bot → MCP server
         * [x] Environment variable management
-    - [ ] API Key Configuration
+    - [x] API Key Configuration
         * [x] Add MCP_API_KEY to both services
         * [x] Update MCPRAGAdapter to send auth headers
     - [ ] Update GitHub secrets
@@ -41,3 +41,9 @@
         * [x] Implement simple API key auth middleware
         * check on the knowledgebase build
 - live knowledge base udpates through tool calls
+
+## v0.5.0 Focus
+- [ ] App Home: inject live MCP/RAG health block
+- [ ] Periodic MCP health polling + status refresh
+- [ ] Validate NancyGPT + Actions against hosted MCP
+- [ ] Resolve retrieve/tree/search reliability edge cases

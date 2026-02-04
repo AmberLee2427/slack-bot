@@ -56,7 +56,6 @@ NB_SECRET_KEY=your-jwt-secret-key-here
 
 # Slack Credentials
 SLACK_BOT_TOKEN=xoxb-your-bot-token
-SLACK_APP_TOKEN=xapp-your-app-token
 SLACK_SIGNING_SECRET=your-signing-secret
 
 # Claude/Anthropic
