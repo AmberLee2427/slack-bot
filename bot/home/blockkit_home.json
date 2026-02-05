@@ -48,7 +48,7 @@
       "elements": [
         {
           "type": "mrkdwn",
-          "text": "💡 *Usage Tips:* • Type `@nancy my quota` in any channel • Quotas reset at midnight UTC • Use 🍳 Keep Cooking for deeper analysis\nContact admin if you need more queries or talk for longer on my customGPT."
+          "text": "💡 *Usage Tips:* • Type `@nancy my quota` in any channel • Quotas reset at midnight UTC • Use 🍳 Keep Cooking for deeper analysis\nContact admin if you need more queries or talk for longer on my [customGPT](https://chatgpt.com/g/g-68a9ed2774fc819189474563060e76f4-nancy)."
         }
       ]
     },

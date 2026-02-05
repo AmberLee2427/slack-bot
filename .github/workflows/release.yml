@@ -84,7 +84,15 @@ jobs:
                   encoding="utf-8",
               )
 
-          embeddings = Embeddings({"method": "bm25", "content": True})
+          # Use the same dense backend expected by rag_core.search.Search
+          # so the real MCP path can load this fixture index.
+          embeddings = Embeddings(
+              {
+                  "path": "sentence-transformers/all-MiniLM-L6-v2",
+                  "content": True,
+                  "backend": "faiss",
+              }
+          )
           embeddings.index(
               [
                   (
