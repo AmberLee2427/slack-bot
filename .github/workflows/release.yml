@@ -44,6 +44,7 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
+          import json
           from pathlib import Path
           from txtai.embeddings import Embeddings
 
@@ -98,13 +99,16 @@ jobs:
                   (
                       f"{doc_id}::chunk-0",
                       doc_text,
-                      {
-                          "source_document": doc_id,
-                          "line_start": 1,
-                          "line_end": 2,
-                          "chunk_index": 0,
-                          "chunk_count": 1,
-                      },
+                      json.dumps(
+                          {
+                              "source_document": doc_id,
+                              "line_start": 1,
+                              "line_end": 2,
+                              "chunk_index": 0,
+                              "chunk_count": 1,
+                          },
+                          ensure_ascii=True,
+                      ),
                   )
               ]
           )
