@@ -16,7 +16,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
-MCP_SERVER_PATH = Path(__file__).parent.parent / "ref" / "nancy-brain" / "run_mcp_server.py"
+MCP_BASE_PATH = Path(__file__).parent.parent / "ref" / "nancy-brain"
+MCP_SERVER_PATH = MCP_BASE_PATH / "connectors" / "mcp_server" / "server.py"
+MCP_CONFIG_PATH = MCP_BASE_PATH / "config" / "repositories.yml"
+MCP_EMBEDDINGS_PATH = MCP_BASE_PATH / "knowledge_base" / "embeddings"
+MCP_WEIGHTS_PATH = MCP_BASE_PATH / "config" / "index_weights.yaml"
 MCP_PORT = 8123
 MCP_BASE_URL = f"http://localhost:{MCP_PORT}"
 
@@ -147,15 +151,37 @@ def mcp_server():
         base_url = stub.base_url
         os.environ["MCP_BASE_URL"] = base_url
     else:
+        missing = []
         if not MCP_SERVER_PATH.exists():
+            missing.append(f"MCP server entrypoint: {MCP_SERVER_PATH}")
+        if not MCP_CONFIG_PATH.exists():
+            missing.append(f"MCP config: {MCP_CONFIG_PATH}")
+        if not MCP_EMBEDDINGS_PATH.exists():
+            missing.append(f"MCP embeddings: {MCP_EMBEDDINGS_PATH}")
+        if not MCP_WEIGHTS_PATH.exists():
+            missing.append(f"MCP weights: {MCP_WEIGHTS_PATH}")
+
+        if missing:
             pytest.exit(
-                f"MCP server script not found at {MCP_SERVER_PATH}. "
-                "Run with MCP_TEST_FORCE_STUB=true to use the stub server.",
+                "Missing MCP runtime files:\n- "
+                + "\n- ".join(missing)
+                + "\n\nRun with MCP_TEST_FORCE_STUB=true to use the stub server.",
                 returncode=1,
             )
         proc = subprocess.Popen(
-            [sys.executable, "-u", os.fspath(MCP_SERVER_PATH), "--http-and-stdio"],
-            cwd=os.fspath(MCP_SERVER_PATH.parent),
+            [
+                sys.executable,
+                "-u",
+                os.fspath(MCP_SERVER_PATH),
+                os.fspath(MCP_CONFIG_PATH),
+                os.fspath(MCP_EMBEDDINGS_PATH),
+                "--weights",
+                os.fspath(MCP_WEIGHTS_PATH),
+                "--port",
+                str(MCP_PORT),
+                "--http-and-stdio",
+            ],
+            cwd=os.fspath(MCP_BASE_PATH),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,

@@ -40,6 +40,70 @@ jobs:
       - name: Install nancy-brain runtime dependencies
         run: pip install -e ./ref/nancy-brain
 
+      - name: Seed minimal MCP fixture index
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from txtai.embeddings import Embeddings
+
+          base = Path("ref/nancy-brain")
+          kb = base / "knowledge_base"
+          embeddings_path = kb / "embeddings"
+          index_path = embeddings_path / "index"
+          index_path.mkdir(parents=True, exist_ok=True)
+
+          doc_id = "microlensing_tools/ci-fixture/README.md"
+          doc_text = (
+              "Roman microlensing CI fixture.\n"
+              "This tiny corpus exists so hardened MCP tests can run in GitHub Actions.\n"
+          )
+
+          # Ensure file-based retrieval path exists.
+          doc_file = kb / doc_id
+          doc_file.parent.mkdir(parents=True, exist_ok=True)
+          doc_file.write_text(doc_text, encoding="utf-8")
+
+          # Keep config deterministic for CI fixture URLs.
+          config_path = base / "config" / "repositories.yml"
+          config_path.parent.mkdir(parents=True, exist_ok=True)
+          config_path.write_text(
+              "microlensing_tools:\n"
+              "  - name: ci-fixture\n"
+              "    url: https://github.com/example/ci-fixture\n"
+              "    description: CI fixture repository for hardened MCP tests\n",
+              encoding="utf-8",
+          )
+
+          weights_path = base / "config" / "index_weights.yaml"
+          if not weights_path.exists():
+              weights_path.write_text(
+                  "extensions:\n"
+                  "  .md: 1.0\n"
+                  "path_includes: {}\n",
+                  encoding="utf-8",
+              )
+
+          embeddings = Embeddings({"method": "bm25", "content": True})
+          embeddings.index(
+              [
+                  (
+                      f"{doc_id}::chunk-0",
+                      doc_text,
+                      {
+                          "source_document": doc_id,
+                          "line_start": 1,
+                          "line_end": 2,
+                          "chunk_index": 0,
+                          "chunk_count": 1,
+                      },
+                  )
+              ]
+          )
+          embeddings.save(str(index_path))
+          print(f"Seeded MCP fixture index at {index_path}")
+          PY
+
       - name: Run hardened pytest (real MCP server required)
         env:
           PYTHONPATH: ${{ github.workspace }}
