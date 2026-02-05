@@ -20,14 +20,42 @@ permissions:
   contents: write
 
 jobs:
+  hardened-tests:
+    name: Hardened Tests (real MCP)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install bot test dependencies
+        run: pip install -e .[dev]
+
+      - name: Install nancy-brain runtime dependencies
+        run: pip install -e ./ref/nancy-brain
+
+      - name: Run hardened pytest (real MCP server required)
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          MCP_TEST_FORCE_STUB: "false"
+        run: pytest -q
+
   github-release:
     name: GitHub Release
+    needs: [hardened-tests]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: recursive
 
       - name: Set up Python
         uses: actions/setup-python@v5

@@ -28,4 +28,5 @@ jobs:
       - name: Run pytest (full suite, includes MCP auto-start)
         env:
           PYTHONPATH: ${{ github.workspace }}
+          MCP_TEST_FORCE_STUB: "true"
         run: pytest -q

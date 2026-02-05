@@ -140,20 +140,19 @@ def mcp_server():
     stub = None
 
     force_stub = os.environ.get("MCP_TEST_FORCE_STUB", "").lower() in {"1", "true", "yes"}
-    missing_real_server = not MCP_SERVER_PATH.exists()
-
-    if force_stub or missing_real_server:
-        reason = (
-            "forced via MCP_TEST_FORCE_STUB"
-            if force_stub
-            else f"missing server script at {MCP_SERVER_PATH}"
-        )
-        print(f"[tests] Using stub MCP server ({reason}).")
+    if force_stub:
+        print("[tests] Using stub MCP server (forced via MCP_TEST_FORCE_STUB).")
         stub = _StubMCPServer(port=0)
         stub.start()
         base_url = stub.base_url
         os.environ["MCP_BASE_URL"] = base_url
     else:
+        if not MCP_SERVER_PATH.exists():
+            pytest.exit(
+                f"MCP server script not found at {MCP_SERVER_PATH}. "
+                "Run with MCP_TEST_FORCE_STUB=true to use the stub server.",
+                returncode=1,
+            )
         proc = subprocess.Popen(
             [sys.executable, "-u", os.fspath(MCP_SERVER_PATH), "--http-and-stdio"],
             cwd=os.fspath(MCP_SERVER_PATH.parent),
@@ -176,19 +175,10 @@ def mcp_server():
                 except Exception:
                     proc.kill()
 
-            # Real server failed to boot (common on CI when submodule/deps are unavailable).
-            # Fall back to the lightweight stub so adapter/HTTP contract tests can still run.
-            print(f"[tests] MCP server failed health check at {health_url}; falling back to stub MCP server.")
+            msg = f"MCP server failed health check at {health_url}"
             if stdout:
-                print(stdout)
-            stub = _StubMCPServer(port=0)
-            stub.start()
-            base_url = stub.base_url
-            os.environ["MCP_BASE_URL"] = base_url
-
-            health_url = f"{base_url}/health"
-            if not _wait_for_health(health_url, timeout=10):
-                pytest.exit(f"MCP server failed health check at {health_url}\n{stdout}", returncode=1)
+                msg = f"{msg}\n{stdout}"
+            pytest.exit(msg, returncode=1)
         else:
             pytest.exit(f"MCP server failed health check at {health_url}", returncode=1)
 
