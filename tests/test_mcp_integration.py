@@ -1,19 +1,22 @@
+import os
 import requests
 
 from bot.plugins.rag.mcp_adapter import MCPRAGAdapter
 
-# Always target the local test server started by the session fixture
-MCP_BASE_URL = "http://localhost:8123"
+
+def _mcp_base_url() -> str:
+    return os.environ.get("MCP_BASE_URL", "http://localhost:8123")
 
 
 def test_mcp_health_endpoint_live(mcp_server):
-    resp = requests.get(f"{MCP_BASE_URL.rstrip('/')}/health", timeout=10)
+    base_url = _mcp_base_url().rstrip("/")
+    resp = requests.get(f"{base_url}/health", timeout=10)
     assert resp.status_code == 200
     assert resp.json().get("status") in ("ok", "degraded")
 
 
 def test_mcp_adapter_round_trip(mcp_server):
-    adapter = MCPRAGAdapter(MCP_BASE_URL, api_key="test-key", timeout=15)
+    adapter = MCPRAGAdapter(_mcp_base_url(), api_key="test-key", timeout=15)
 
     results = adapter.search("microlensing", limit=3)
     assert results, "Expected search results from MCP server"
