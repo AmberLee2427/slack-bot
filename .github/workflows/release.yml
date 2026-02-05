@@ -120,6 +120,8 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
           MCP_TEST_FORCE_STUB: "false"
+          # Required by Nancy Brain HTTP auth bootstrap (non-default value).
+          NB_SECRET_KEY: "ci-hardened-mcp-secret-key"
         run: pytest -q
 
   github-release:
