@@ -21,6 +21,14 @@ An intelligent Slack bot designed to support participants in the **Roman Galacti
 - `v0.4.x` baseline is complete: Dockerized bot+MCP deployment, MCP API key auth, MCP-only RAG adapter wiring.
 - Next implementation target: `v0.5.0` (beta hardening and production-readiness work).
 
+## 🚢 GitHub Releases
+
+This project publishes releases on GitHub (not PyPI).
+
+- Manual: run the `Release` workflow in Actions and provide a version (for example `0.5.0`).
+- Tag-driven: push a tag like `v0.5.0`.
+- The workflow validates that `pyproject.toml` version matches the release version before creating the release.
+
 ## 🎯 Purpose
 
 The Roman mission will revolutionize our understanding of exoplanets through gravitational microlensing. This bot serves as an AI assistant that can:
