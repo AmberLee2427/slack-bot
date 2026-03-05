@@ -9,6 +9,7 @@ services:
       - "8000:8000"
     environment:
       - MCP_PORT=8000
+      - MCP_TRANSPORT=http
       - MCP_API_KEY=${MCP_API_KEY}
       - MCP_INVITE_CODES=${MCP_INVITE_CODES}
       - NB_SECRET_KEY=${NB_SECRET_KEY}

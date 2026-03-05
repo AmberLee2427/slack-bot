@@ -74,7 +74,7 @@
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "*🔧 MCP Client Config (Claude / VS Code / Gemini CLI)*\n\nUse Nancy Brain as an MCP tool in your editor. Full examples: <https://github.com/AmberLee2427/nancy-brain/blob/master/examples/mcp-settings.example.json|mcp-settings.example.json>\n\n```json\n{\n  \"mcpServers\": {\n    \"nancy-brain\": {\n      \"command\": \"npx\",\n      \"args\": [\n        \"-y\",\n        \"@modelcontextprotocol/server-sse\",\n        \"--url\", \"https://your-server/sse\",\n        \"--api-key\", \"$MCP_API_KEY\"\n      ]\n    }\n  }\n}\n```"
+        "text": "*🔧 Access Config (Hosted Nancy + Custom MCP)*\n\n*Hosted Nancy (cloud API):* Get your key with `/mcp_api_key`, then pass it as `X-API-Key`.\n\n```bash\ncurl -H \"X-API-Key: $MCP_API_KEY\" \"https://nancy-brain.malpas.nz/search?query=roman&limit=5\"\n```\n\n*Custom build (full MCP in editor via stdio):*\n\n```json\n{\n  \"mcpServers\": {\n    \"nancy-brain\": {\n      \"command\": \"nancy-brain-mcp\",\n      \"args\": [\n        \"--embeddings-path\", \"/path/to/knowledge_base/embeddings\",\n        \"--config\", \"/path/to/config/repositories.yml\",\n        \"--weights\", \"/path/to/config/weights.yaml\"\n      ]\n    }\n  }\n}\n```"
       }
     },
     {
