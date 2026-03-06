@@ -147,8 +147,8 @@
 - rename repo as `nancy-bot` (AKA Nancy Bot)
 
 ## Nancy-Brain
-- ADS library integration
-- more MCP tools (docker them(?) and repackage selected useful tools as internal)
+- [ ] ADS library integration
+- more MCP tools (docker mcp wrapper them(?) and repackage selected useful tools as internal)
 - Docker
     - [x] MCP Server Dockerization (in ref/nancy-brain/)
         * [x] Create Dockerfile with embeddings build step
