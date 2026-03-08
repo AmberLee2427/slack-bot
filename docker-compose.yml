@@ -14,6 +14,7 @@ services:
       - MCP_INVITE_CODES=${MCP_INVITE_CODES}
       - NB_SECRET_KEY=${NB_SECRET_KEY}
       - NB_USE_LOCAL_SUMMARY=true
+      - ALLOW_PICKLE=1
       - PYTHONUNBUFFERED=1
       - KMP_DUPLICATE_LIB_OK=TRUE
     volumes:
