@@ -173,3 +173,28 @@ class MCPRAGAdapter:
             self._logger.error("MCP retrieve failed: %s", exc)
             raise MCPAdapterError(exc)
 
+    def list_tree(self, prefix: str = "", depth: int = 2, max_entries: int = 500) -> list:
+        """Return a flat list of {path, type} entries from the MCP /tree endpoint."""
+        url = f"{self.base_url}/tree"
+        try:
+            resp = self._session.get(url, params={"prefix": prefix, "depth": depth, "max_entries": max_entries}, timeout=self.timeout)
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("entries", [])
+        except Exception as exc:
+            self._logger.error("MCP list_tree failed: %s", exc)
+            raise MCPAdapterError(exc)
+
+    def set_weight(self, doc_id: str, multiplier: float, namespace: str = "global", ttl_days=None) -> None:
+        """Push a retrieval weight multiplier to the MCP /weight endpoint."""
+        url = f"{self.base_url}/weight"
+        payload = {"doc_id": doc_id, "multiplier": multiplier, "namespace": namespace}
+        if ttl_days is not None:
+            payload["ttl_days"] = ttl_days
+        try:
+            resp = self._session.post(url, json=payload, timeout=self.timeout)
+            resp.raise_for_status()
+        except Exception as exc:
+            self._logger.error("MCP set_weight failed: %s", exc)
+            raise MCPAdapterError(exc)
+

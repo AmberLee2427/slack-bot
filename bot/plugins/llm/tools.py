@@ -101,50 +101,65 @@ def search_tool(self, llm_text: str, callback_fn=None) -> str:
 def tree_tool(self, llm_text: str):
     """
     This function handles the TREE tool.
-    It extracts the tree directory from the LLM response and updates the meta prompt.
+    Delegates to the MCP /tree endpoint so filtering and index-reading
+    stay in one place (server-side).
     """
     meta_prompt = ""
     lines = llm_text.splitlines()
     for line in lines:
         if "TREE:" in line:
             tree_dir = line.split("TREE:")[1].strip().split()[0].rstrip("]")
-            # Build virtual tree from indexed files
             tree_dir = tree_dir.rstrip("/")
-            subdirs = set()
-            files = []
             prefix = tree_dir + "/" if tree_dir else ""
-            for doc_id in self.all_indexed_files:
-                if doc_id.startswith(prefix):
-                    rest = doc_id[len(prefix):]
-                    if "/" in rest:
-                        subdir = rest.split("/")[0]
-                        subdirs.add(subdir)
+            try:
+                entries = self.rag.list_tree(prefix=prefix, depth=3)
+                if entries:
+                    lines_out = []
+                    for e in entries:
+                        path = e.get("path", "")
+                        # Show path relative to the requested prefix
+                        rel = path[len(prefix):] if prefix and path.startswith(prefix) else path
+                        if not rel:
+                            continue
+                        if e.get("type") in ("dir", "directory"):
+                            lines_out.append(f"[DIR] {rel}/")
+                        else:
+                            lines_out.append(f"      {rel}")
+                    if lines_out:
+                        meta_prompt += f"\n\nTREE: Listing for '{tree_dir}':\n" + "\n".join(lines_out)
                     else:
-                        files.append(rest)
-            entries = [f"[DIR] {d}/" for d in sorted(subdirs)] + [f"      {f}" for f in sorted(files)]
-            if entries:
-                meta_prompt += f"\n\nTREE: Listing for '{tree_dir}':\n" + "\n".join(entries)
-            else:
-                meta_prompt += f"\n\nTREE: Directory '{tree_dir}' not found or empty in index."
+                        meta_prompt += f"\n\nTREE: Directory '{tree_dir}' not found or empty in index."
+                else:
+                    meta_prompt += f"\n\nTREE: Directory '{tree_dir}' not found or empty in index."
+            except Exception as exc:
+                meta_prompt += f"\n\nTREE: Error listing '{tree_dir}': {exc}"
 
     return meta_prompt
 
 def weight_tool(self, llm_text: str, model_weights: dict, model_weights_path: str) -> tuple[dict, str]:
     """
     This function handles the WEIGHT tool.
-    It extracts the file path(s) from the LLM response and updates the model weights.
+    Forwards weight updates to the MCP server so they actually affect search results.
     """
     lines = llm_text.splitlines()
     meta_prompt = f"\n\nModel reweighting:"
     for line in lines:
         if "WEIGHT:" in line:
-            path = line.split("WEIGHT:")[1].strip().split()[0].rstrip("]")
-            score_str = line.split("WEIGHT:")[1].strip().split()[1].rstrip("]")
-            score_multiplier = float(score_str)
+            parts = line.split("WEIGHT:")[1].strip().split()
+            path = parts[0].rstrip("]")
+            score_multiplier = float(parts[1].rstrip("]")) if len(parts) > 1 else 1.0
             model_weights[path] = score_multiplier
-            meta_prompt += f"\nWeighting file: {path} with multiplier: {score_multiplier}"
+            # Forward to MCP server so weights take effect server-side
+            if getattr(self, "rag", None) and hasattr(self.rag, "set_weight"):
+                try:
+                    self.rag.set_weight(doc_id=path, multiplier=score_multiplier)
+                    meta_prompt += f"\nWeighting file: {path} with multiplier: {score_multiplier}"
+                except Exception as exc:
+                    meta_prompt += f"\nWeighting file: {path} with multiplier: {score_multiplier} (MCP sync failed: {exc})"
+            else:
+                meta_prompt += f"\nWeighting file: {path} with multiplier: {score_multiplier}"
 
-    #save model weights
+    # Keep local file in sync as a record
     with open(model_weights_path, "w") as f:
         yaml.safe_dump(model_weights, f)
 
