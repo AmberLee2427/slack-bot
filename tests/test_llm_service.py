@@ -1,9 +1,11 @@
 import os
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
+from bot.plugins.llm import llm_service as llm_module
 from bot.plugins.llm.llm_service import LLMService
 
 
@@ -57,7 +59,9 @@ def _mock_env(monkeypatch, tmp_path):
 def test_llm_service_initializes_with_mock_adapter(monkeypatch, _mock_env):
     # Patch MCPRAGAdapter and requests.get to avoid real network calls
     monkeypatch.setattr("bot.plugins.rag.mcp_adapter.MCPRAGAdapter", DummyAdapter)
-    monkeypatch.setattr("bot.plugins.llm.llm_service.requests.get", lambda *_, **__: FakeResp())
+    monkeypatch.setattr(
+        "bot.plugins.llm.llm_service.requests.get", lambda *_, **__: FakeResp()
+    )
 
     llm = LLMService(
         system_prompt=_mock_env["prompt"],
@@ -69,3 +73,99 @@ def test_llm_service_initializes_with_mock_adapter(monkeypatch, _mock_env):
     assert llm.get_initial_context("ping").startswith("context for ping")
     assert llm.all_indexed_files == ["doc1"]
     assert llm.indexed_file_map["doc1"] == "hello world"
+
+
+def _bare_service(custom_enabled: bool = True) -> LLMService:
+    llm = object.__new__(LLMService)
+    llm.debugging = False
+    llm.custom_api_key = "custom-secret" if custom_enabled else None
+    llm.custom_model = "agents-a1" if custom_enabled else None
+    llm.custom_url = "https://api.example.test/v1" if custom_enabled else ""
+    llm.custom_enabled = custom_enabled
+    llm.force_custom_fallback = False
+    llm.rate_limiter = MagicMock()
+    return llm
+
+
+def test_quota_exhaustion_selects_custom_provider():
+    llm = _bare_service()
+    llm.rate_limiter.check_and_increment.return_value = (False, 100, 0)
+
+    provider, message = llm._provider_for_interaction("U123")
+
+    assert provider == "custom"
+    assert message is None
+
+
+def test_quota_exhaustion_without_custom_returns_limit_message():
+    llm = _bare_service(custom_enabled=False)
+    llm.rate_limiter.check_and_increment.return_value = (False, 100, 0)
+
+    provider, message = llm._provider_for_interaction("U123")
+
+    assert provider is None
+    assert "Daily Limit Reached" in message
+
+
+def test_allowed_interaction_stays_on_anthropic():
+    llm = _bare_service()
+    llm.rate_limiter.check_and_increment.return_value = (True, 100, 0)
+
+    provider, message = llm._provider_for_interaction("U123")
+
+    assert provider == "anthropic"
+    assert message is None
+
+
+def test_custom_provider_uses_openai_chat_completions(monkeypatch):
+    llm = _bare_service()
+    response = MagicMock()
+    response.json.return_value = {
+        "choices": [{"message": {"content": "SEARCH: microlensing limit 5"}}]
+    }
+    post = MagicMock(return_value=response)
+    monkeypatch.setattr(llm_module.requests, "post", post)
+
+    result = llm._query_custom(
+        {
+            "system": "system prompt",
+            "messages": [{"role": "user", "content": "question"}],
+        }
+    )
+
+    assert result == "SEARCH: microlensing limit 5"
+    response.raise_for_status.assert_called_once_with()
+    assert post.call_args.args[0] == "https://api.example.test/v1/chat/completions"
+    request = post.call_args.kwargs
+    assert request["headers"]["Authorization"] == "Bearer custom-secret"
+    assert request["json"]["model"] == "agents-a1"
+    assert request["json"]["messages"][0] == {
+        "role": "system",
+        "content": "system prompt",
+    }
+    assert "custom-secret" not in str(request["json"])
+
+
+def test_anthropic_usage_error_latches_custom_fallback(monkeypatch):
+    class UsageError(Exception):
+        status_code = 429
+
+    llm = _bare_service()
+    anthropic = MagicMock()
+    anthropic.messages.create.side_effect = UsageError("rate limit exceeded")
+    monkeypatch.setattr(llm_module, "anthropic_client", anthropic)
+    custom = MagicMock(return_value="RESPONSE fallback worked [DONE]")
+    monkeypatch.setattr(llm, "_query_custom", custom)
+    payload = {
+        "system": "system prompt",
+        "messages": [{"role": "user", "content": "question"}],
+    }
+
+    first, _ = llm.querry_llm(payload, turn=0, provider="anthropic")
+    second, _ = llm.querry_llm(payload, turn=1, provider="anthropic")
+
+    assert first == "RESPONSE fallback worked [DONE]"
+    assert second == first
+    assert llm.force_custom_fallback is True
+    assert anthropic.messages.create.call_count == 1
+    assert custom.call_count == 2

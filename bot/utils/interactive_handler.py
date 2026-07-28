@@ -2,6 +2,7 @@
 Interactive Handler
 Handles Slack interactive components like buttons and modals
 """
+
 import json
 import logging
 from typing import Dict, Any
@@ -9,35 +10,35 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+
 class InteractiveHandler:
     """Handles Slack interactive components (buttons, modals, etc.)"""
-    
+
     def __init__(self, slack_client, base_dir: Path, message_handler=None):
         self.slack_client = slack_client
         self.base_dir = base_dir
         self.message_handler = message_handler
-    
+
     async def handle_home_opened(self, event: Dict[str, Any]):
         """Handle when user opens Nancy's Home tab"""
         user_id = event["user"]
-        
+
         try:
             # Load home page blocks from JSON file
             home_path = self.base_dir / "bot" / "home" / "blockkit_home.json"
-            
+
             if home_path.exists():
-                with open(home_path, 'r') as f:
+                with open(home_path, "r") as f:
                     home_blocks = json.load(f)
-                    
+
                 # Publish home view
                 await self.slack_client.publish_home_view(
-                    user_id=user_id,
-                    view=home_blocks
+                    user_id=user_id, view=home_blocks
                 )
                 logger.info(f"Published home view for user {user_id}")
             else:
                 logger.error(f"Home page template not found at {home_path}")
-                
+
         except Exception as e:
             logger.error(f"Error handling view repos: {e}")
 
@@ -47,26 +48,26 @@ class InteractiveHandler:
             user_id = payload["user"]["id"]
             channel_id = payload["channel"]["id"]
             message = payload["message"]
-            
+
             # Extract the original message text and context
             thread_ts = message.get("thread_ts") or message.get("ts")
-            
+
             # Send acknowledgment that we're cooking more
             await self.slack_client.send_message(
                 channel=channel_id,
                 text="🍳 *Keep cooking activated!* Giving Nancy 5 more turns to expand her analysis...",
-                thread_ts=thread_ts
+                thread_ts=thread_ts,
             )
-            
+
             # If we have a message handler, trigger expanded analysis with extended turns
             if self.message_handler:
                 # Get conversation history for context
                 conversation_history = []
-                if hasattr(self.message_handler, 'conversation_manager'):
+                if hasattr(self.message_handler, "conversation_manager"):
                     conversation_history = await self.message_handler.conversation_manager.get_conversation_context(
                         channel_id, thread_ts, max_messages=10
                     )
-                
+
                 # Create callback for sending updates
                 async def send_update(text: str, is_final: bool = False):
                     if is_final:
@@ -74,10 +75,7 @@ class InteractiveHandler:
                         blocks = [
                             {
                                 "type": "section",
-                                "text": {
-                                    "type": "mrkdwn",
-                                    "text": text
-                                }
+                                "text": {"type": "mrkdwn", "text": text},
                             },
                             {
                                 "type": "actions",
@@ -87,42 +85,37 @@ class InteractiveHandler:
                                         "text": {
                                             "type": "plain_text",
                                             "text": "🍳 Keep Cooking",
-                                            "emoji": True
+                                            "emoji": True,
                                         },
                                         "value": "keep_cooking",
                                         "action_id": "btn_keep_cooking",
-                                        "style": "primary"
+                                        "style": "primary",
                                     }
-                                ]
-                            }
+                                ],
+                            },
                         ]
-                        
+
                         await self.slack_client.send_message(
                             channel=channel_id,
                             text=text,
                             blocks=blocks,
-                            thread_ts=thread_ts
+                            thread_ts=thread_ts,
                         )
                     else:
                         # Send intermediate status updates
                         blocks = [
                             {
                                 "type": "context",
-                                "elements": [
-                                    {
-                                        "type": "mrkdwn",
-                                        "text": f"ℹ️ {text}"
-                                    }
-                                ]
+                                "elements": [{"type": "mrkdwn", "text": f"ℹ️ {text}"}],
                             }
                         ]
                         await self.slack_client.send_message(
                             channel=channel_id,
                             text=text,
                             blocks=blocks,
-                            thread_ts=thread_ts
+                            thread_ts=thread_ts,
                         )
-                
+
                 # Use the LLM service's new continue method with extended turns
                 llm_service = self.message_handler.llm_service
                 await llm_service.continue_with_extended_turns(
@@ -130,19 +123,21 @@ class InteractiveHandler:
                     conversation_history=conversation_history,
                     thread_ts=thread_ts,
                     additional_turns=5,  # Give Nancy 5 more turns to cook
-                    user_id=user_id  # Pass user_id for rate limiting
+                    user_id=user_id,  # Pass user_id for rate limiting
                 )
-                
+
             else:
                 # Fallback if no message handler is connected
                 await self.slack_client.send_message(
                     channel=channel_id,
                     text="I'd love to keep cooking, but my expansion capabilities aren't connected yet! 🔧",
-                    thread_ts=thread_ts
+                    thread_ts=thread_ts,
                 )
-            
-            logger.info(f"Keep cooking with extended turns requested by user {user_id} for message in channel {channel_id}")
-            
+
+            logger.info(
+                f"Keep cooking with extended turns requested by user {user_id} for message in channel {channel_id}"
+            )
+
         except Exception as e:
             logger.error(f"Error handling keep cooking: {e}")
 
@@ -150,12 +145,12 @@ class InteractiveHandler:
         """Handle interactive components (buttons, etc.)"""
         user_id = payload["user"]["id"]
         trigger_id = payload.get("trigger_id")
-        
+
         # Handle button actions
         if payload["type"] == "block_actions":
             action = payload["actions"][0]
             action_id = action["action_id"]
-            
+
             if action_id == "btn_view_docs":
                 await self.handle_view_docs(user_id, trigger_id)
             elif action_id == "btn_view_articles":
@@ -175,44 +170,35 @@ class InteractiveHandler:
             # Create a modal or send a message about challenge docs
             modal = {
                 "type": "modal",
-                "title": {
-                    "type": "plain_text",
-                    "text": "📋 Challenge Docs"
-                },
-                "close": {
-                    "type": "plain_text",
-                    "text": "Close"
-                },
+                "title": {"type": "plain_text", "text": "📋 Challenge Docs"},
+                "close": {"type": "plain_text", "text": "Close"},
                 "blocks": [
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": "*Roman Galactic Exoplanet Survey - Data Challenge Resources*\n\nI have access to comprehensive documentation about:"
-                        }
+                            "text": "*Roman Galactic Exoplanet Survey - Data Challenge Resources*\n\nI have access to comprehensive documentation about:",
+                        },
                     },
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": "• **Submission procedures** via `microlens-submit`\n• **Data challenge guidelines** and requirements\n• **Analysis workflows** and best practices\n• **Technical specifications** for Roman telescope\n• **Tutorial notebooks** for microlensing analysis"
-                        }
+                            "text": "• **Submission procedures** via `microlens-submit`\n• **Data challenge guidelines** and requirements\n• **Analysis workflows** and best practices\n• **Technical specifications** for Roman telescope\n• **Tutorial notebooks** for microlensing analysis",
+                        },
                     },
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": "💬 *Just ask me anything!* Try questions like:\n• \"How do I submit my results?\"\n• \"What are the data challenge requirements?\"\n• \"Show me Roman telescope specifications\""
-                        }
-                    }
-                ]
+                            "text": '💬 *Just ask me anything!* Try questions like:\n• "How do I submit my results?"\n• "What are the data challenge requirements?"\n• "Show me Roman telescope specifications"',
+                        },
+                    },
+                ],
             }
-            
-            await self.slack_client.views_open(
-                trigger_id=trigger_id,
-                view=modal
-            )
-            
+
+            await self.slack_client.views_open(trigger_id=trigger_id, view=modal)
+
         except Exception as e:
             logger.error(f"Error in handle_view_docs: {e}")
 
@@ -220,45 +206,36 @@ class InteractiveHandler:
         """Handle 'Research Articles' button click"""
         try:
             modal = {
-                "type": "modal", 
-                "title": {
-                    "type": "plain_text",
-                    "text": "📚 Articles"
-                },
-                "close": {
-                    "type": "plain_text",
-                    "text": "Close"
-                },
+                "type": "modal",
+                "title": {"type": "plain_text", "text": "📚 Articles"},
+                "close": {"type": "plain_text", "text": "Close"},
                 "blocks": [
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": "*Microlensing Research Papers in My Knowledge Base*\n\nI can help you with content from:"
-                        }
+                            "text": "*Microlensing Research Papers in My Knowledge Base*\n\nI can help you with content from:",
+                        },
                     },
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": "• **Foundation papers** (Paczynski 1986, Gould 1992)\n• **Binary lens theory** (Mao & Paczynski 1991)\n• **Planet detection** (Gould & Loeb 1992)\n• **Survey predictions** (Penny et al. 2019)\n• **Review articles** (Gaudi 2012, Mao 2012)\n• **Roman mission reports** (Spergel et al. 2015)"
-                        }
+                            "text": "• **Foundation papers** (Paczynski 1986, Gould 1992)\n• **Binary lens theory** (Mao & Paczynski 1991)\n• **Planet detection** (Gould & Loeb 1992)\n• **Survey predictions** (Penny et al. 2019)\n• **Review articles** (Gaudi 2012, Mao 2012)\n• **Roman mission reports** (Spergel et al. 2015)",
+                        },
                     },
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": "🔍 *Ask me about any research topic!*\n• \"Explain gravitational microlensing theory\"\n• \"What did Penny et al predict for Roman?\"\n• \"Compare different microlensing surveys\""
-                        }
-                    }
-                ]
+                            "text": '🔍 *Ask me about any research topic!*\n• "Explain gravitational microlensing theory"\n• "What did Penny et al predict for Roman?"\n• "Compare different microlensing surveys"',
+                        },
+                    },
+                ],
             }
-            
-            await self.slack_client.views_open(
-                trigger_id=trigger_id,
-                view=modal
-            )
-            
+
+            await self.slack_client.views_open(trigger_id=trigger_id, view=modal)
+
         except Exception as e:
             logger.error(f"Error in handle_view_articles: {e}")
 
@@ -267,44 +244,35 @@ class InteractiveHandler:
         try:
             modal = {
                 "type": "modal",
-                "title": {
-                    "type": "plain_text",
-                    "text": "💻 Code Repos"
-                },
-                "close": {
-                    "type": "plain_text",
-                    "text": "Close"
-                },
+                "title": {"type": "plain_text", "text": "💻 Code Repos"},
+                "close": {"type": "plain_text", "text": "Close"},
                 "blocks": [
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": "*Open Source Tools & Code in My Knowledge Base*\n\nI can help with documentation and examples from:"
-                        }
+                            "text": "*Open Source Tools & Code in My Knowledge Base*\n\nI can help with documentation and examples from:",
+                        },
                     },
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": "• **Analysis tools** (pyLIMA, MulensModel, VBMicrolensing)\n• **Roman simulators** (romanisim, gulls, PopSyCLE)\n• **Statistical tools** (emcee, dynesty, corner)\n• **Tutorial notebooks** (microlensing-tutorials)\n• **Data challenge tools** (microlens-submit)\n• **Roman pipeline** (romancal, roman_tools)"
-                        }
+                            "text": "• **Analysis tools** (pyLIMA, MulensModel, VBMicrolensing)\n• **Roman simulators** (romanisim, gulls, PopSyCLE)\n• **Statistical tools** (emcee, dynesty, corner)\n• **Tutorial notebooks** (microlensing-tutorials)\n• **Data challenge tools** (microlens-submit)\n• **Roman pipeline** (romancal, roman_tools)",
+                        },
                     },
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": "🛠️ *Get coding help and examples!*\n• \"How do I use pyLIMA for fitting?\"\n• \"Show me MulensModel examples\"\n• \"What's the difference between analysis tools?\""
-                        }
-                    }
-                ]
+                            "text": '🛠️ *Get coding help and examples!*\n• "How do I use pyLIMA for fitting?"\n• "Show me MulensModel examples"\n• "What\'s the difference between analysis tools?"',
+                        },
+                    },
+                ],
             }
-            
-            await self.slack_client.views_open(
-                trigger_id=trigger_id,
-                view=modal
-            )
-            
+
+            await self.slack_client.views_open(trigger_id=trigger_id, view=modal)
+
         except Exception as e:
             logger.error(f"Error in handle_view_repos: {e}")
 
@@ -312,20 +280,24 @@ class InteractiveHandler:
         """Handle 'Check My Usage' button click from home page"""
         try:
             user_id = payload["user"]["id"]
-            
-            if self.message_handler and hasattr(self.message_handler, 'llm_service'):
+
+            if self.message_handler and hasattr(self.message_handler, "llm_service"):
                 # Get user's personal stats
-                user_stats = self.message_handler.llm_service.rate_limiter.get_user_stats(user_id)
-                
+                user_stats = (
+                    self.message_handler.llm_service.rate_limiter.get_user_stats(
+                        user_id
+                    )
+                )
+
                 used = user_stats["used_today"]
                 daily_limit = user_stats["daily_limit"]
                 remaining = user_stats["remaining"]
                 percentage = (used / daily_limit) * 100 if daily_limit > 0 else 0
-                
+
                 # Get status indicator
                 if percentage >= 100:
-                    indicator = "🚫"
-                    status = "Quota Exceeded"
+                    indicator = "🔄"
+                    status = "Using Custom Fallback"
                 elif percentage >= 90:
                     indicator = "⚠️"
                     status = "Almost Full"
@@ -335,98 +307,92 @@ class InteractiveHandler:
                 else:
                     indicator = "✅"
                     status = "Looking Good"
-                
+
                 # Create modal with usage stats
                 modal = {
                     "type": "modal",
-                    "title": {
-                        "type": "plain_text",
-                        "text": "📊 Your Usage Today"
-                    },
+                    "title": {"type": "plain_text", "text": "📊 Sonnet Usage Today"},
                     "blocks": [
                         {
                             "type": "section",
                             "text": {
                                 "type": "mrkdwn",
-                                "text": f"{indicator} *Status: {status}*"
-                            }
+                                "text": f"{indicator} *Status: {status}*",
+                            },
                         },
                         {
                             "type": "section",
                             "fields": [
                                 {
                                     "type": "mrkdwn",
-                                    "text": f"*Used Today:*\n{used} queries"
+                                    "text": f"*Sonnet Used:*\n{used} queries",
                                 },
                                 {
                                     "type": "mrkdwn",
-                                    "text": f"*Daily Limit:*\n{daily_limit} queries"
+                                    "text": f"*Sonnet Allowance:*\n{daily_limit} queries",
                                 },
                                 {
                                     "type": "mrkdwn",
-                                    "text": f"*Remaining:*\n{remaining} queries"
+                                    "text": f"*Sonnet Remaining:*\n{remaining} queries",
                                 },
                                 {
                                     "type": "mrkdwn",
-                                    "text": f"*Usage:*\n{percentage:.0f}%"
-                                }
-                            ]
+                                    "text": f"*Usage:*\n{percentage:.0f}%",
+                                },
+                            ],
                         },
                         {
                             "type": "context",
                             "elements": [
                                 {
                                     "type": "mrkdwn",
-                                    "text": "Your quota resets at midnight UTC each day."
+                                    "text": (
+                                        "Sonnet resets at midnight UTC. Nancy uses "
+                                        "the custom fallback after the allowance."
+                                    ),
                                 }
-                            ]
-                        }
-                    ]
+                            ],
+                        },
+                    ],
                 }
-                
+
                 # Add tip based on usage
                 if percentage >= 90:
-                    tip_text = "💡 You're running low! Consider saving complex questions for tomorrow."
+                    tip_text = "💡 Nancy will continue on the custom model after Sonnet runs out."
                 elif percentage >= 70:
-                    tip_text = "💡 You're using Nancy quite a bit today. Great questions!"
+                    tip_text = (
+                        "💡 You're using Nancy quite a bit today. Great questions!"
+                    )
                 else:
                     tip_text = "💡 You have plenty of queries left. Feel free to ask detailed questions!"
-                
-                modal["blocks"].append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": tip_text
-                    }
-                })
-                
-                await self.slack_client.views_open(
-                    trigger_id=payload["trigger_id"],
-                    view=modal
+
+                modal["blocks"].append(
+                    {"type": "section", "text": {"type": "mrkdwn", "text": tip_text}}
                 )
-                
+
+                await self.slack_client.views_open(
+                    trigger_id=payload["trigger_id"], view=modal
+                )
+
             else:
                 # Fallback if no message handler is connected
                 await self.slack_client.views_open(
                     trigger_id=payload["trigger_id"],
                     view={
                         "type": "modal",
-                        "title": {
-                            "type": "plain_text",
-                            "text": "Usage Stats"
-                        },
+                        "title": {"type": "plain_text", "text": "Usage Stats"},
                         "blocks": [
                             {
                                 "type": "section",
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": "❌ *Usage tracking not available*\n\nTry typing `@nancy my quota` in any channel instead."
-                                }
+                                    "text": "❌ *Usage tracking not available*\n\nTry typing `@nancy my quota` in any channel instead.",
+                                },
                             }
-                        ]
-                    }
+                        ],
+                    },
                 )
-                
+
         except Exception as e:
             logger.error(f"Error handling my usage: {e}")
             # Send error modal
@@ -435,20 +401,17 @@ class InteractiveHandler:
                     trigger_id=payload["trigger_id"],
                     view={
                         "type": "modal",
-                        "title": {
-                            "type": "plain_text",
-                            "text": "Error"
-                        },
+                        "title": {"type": "plain_text", "text": "Error"},
                         "blocks": [
                             {
                                 "type": "section",
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": "❌ *Error retrieving usage stats*\n\nTry typing `@nancy my quota` in any channel instead."
-                                }
+                                    "text": "❌ *Error retrieving usage stats*\n\nTry typing `@nancy my quota` in any channel instead.",
+                                },
                             }
-                        ]
-                    }
+                        ],
+                    },
                 )
             except Exception:
                 pass  # Best effort

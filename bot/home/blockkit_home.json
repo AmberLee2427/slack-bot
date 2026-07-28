@@ -24,7 +24,7 @@
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "*📊 Daily Usage Limits*\n\nTo ensure fair access for everyone, you have a daily quota of questions. Check your usage anytime!"
+        "text": "*📊 Daily Sonnet Allowance*\n\nEach user has a daily Sonnet allowance. After it is used, Nancy automatically continues on the custom model."
       }
     },
     {
