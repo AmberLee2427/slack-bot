@@ -105,6 +105,28 @@ class MessageHandler:
 
                 # Create a callback for sending intermediate messages
                 status_ts = None
+                status_updated_at = None
+                status_min_display_seconds = float(
+                    os.environ.get("SLACK_STATUS_MIN_DISPLAY_SECONDS", "1.5")
+                )
+
+                async def clear_status():
+                    nonlocal status_ts
+
+                    if not status_ts:
+                        return
+                    try:
+                        await self.slack_client.delete_message(
+                            channel=channel,
+                            ts=status_ts,
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "Unable to remove working status %s: %s",
+                            status_ts,
+                            exc,
+                        )
+                    status_ts = None
 
                 async def send_message(
                     text: str,
@@ -112,21 +134,7 @@ class MessageHandler:
                     is_final: bool = False,
                     hit_turn_limit: bool = False,
                 ):
-                    nonlocal status_ts
-
-                    if is_final and status_ts:
-                        try:
-                            await self.slack_client.delete_message(
-                                channel=channel,
-                                ts=status_ts,
-                            )
-                        except Exception as exc:
-                            logger.warning(
-                                "Unable to remove working status %s: %s",
-                                status_ts,
-                                exc,
-                            )
-                        status_ts = None
+                    nonlocal status_ts, status_updated_at
 
                     if is_final and hit_turn_limit:
                         # Only show "Keep Cooking" button when Nancy actually hit the turn limit
@@ -176,12 +184,25 @@ class MessageHandler:
                         ]
                         if status_ts:
                             try:
+                                if (
+                                    status_updated_at is not None
+                                    and status_min_display_seconds > 0
+                                ):
+                                    elapsed = (
+                                        asyncio.get_running_loop().time()
+                                        - status_updated_at
+                                    )
+                                    if elapsed < status_min_display_seconds:
+                                        await asyncio.sleep(
+                                            status_min_display_seconds - elapsed
+                                        )
                                 await self.slack_client.update_message(
                                     channel=channel,
                                     ts=status_ts,
                                     text=text,
                                     blocks=blocks,
                                 )
+                                status_updated_at = asyncio.get_running_loop().time()
                                 return
                             except Exception as exc:
                                 logger.warning(
@@ -199,6 +220,7 @@ class MessageHandler:
                         )
                         if response:
                             status_ts = response.get("ts")
+                            status_updated_at = asyncio.get_running_loop().time()
 
                 # Generate response using RAG + LLM with callback
                 # First, get conversation history for context
@@ -229,6 +251,7 @@ class MessageHandler:
                     conversation_history,
                     thread_ts,  # Pass thread_ts for context caching
                     user,  # Pass user_id for rate limiting
+                    status_cleanup_callback=clear_status,
                 )
         except Exception as e:
             logger.error(f"Error in process_message: {e}")
@@ -361,6 +384,7 @@ class MessageHandler:
         conversation_history: List[Dict[str, Any]] = None,
         thread_ts: str = None,
         user_id: str = None,
+        status_cleanup_callback: Callable = None,
     ):
         """Generate AI response with intermediate updates and conversation context"""
         try:
@@ -484,6 +508,12 @@ class MessageHandler:
                 is_final=True,
                 hit_turn_limit=False,
             )
+        finally:
+            if status_cleanup_callback:
+                try:
+                    await status_cleanup_callback()
+                except Exception as exc:
+                    logger.warning("Unable to clean up working status: %s", exc)
 
     async def generate_response(self, query: str) -> str:
         """Generate AI response using RAG + LLM"""

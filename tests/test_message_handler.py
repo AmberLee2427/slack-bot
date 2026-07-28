@@ -3,6 +3,40 @@ import pytest
 from bot.utils.message_handler import MessageHandler
 
 
+class FakeSlackClient:
+    def __init__(self):
+        self.calls = []
+
+    def is_available(self):
+        return True
+
+    async def get_bot_user_id(self):
+        return "B123"
+
+    async def send_message(
+        self,
+        channel,
+        text=None,
+        blocks=None,
+        thread_ts=None,
+    ):
+        self.calls.append(("send", text, thread_ts))
+        return {"ts": "status-ts" if blocks else "response-ts"}
+
+    async def update_message(self, channel, ts, text=None, blocks=None):
+        self.calls.append(("update", text, ts))
+        return {"ts": ts}
+
+    async def delete_message(self, channel, ts):
+        self.calls.append(("delete", None, ts))
+        return {"ok": True}
+
+
+class FakeConversationManager:
+    async def get_conversation_history(self, channel_id, thread_ts, limit):
+        return []
+
+
 class CallbackLLM:
     def call_llm_with_callback(
         self,
@@ -98,3 +132,27 @@ async def test_slow_llm_emits_working_heartbeat(monkeypatch):
     ]
     assert len(heartbeats) >= 2
     assert delivered[-1] == ("finished", True, False)
+
+
+@pytest.mark.asyncio
+async def test_status_is_deleted_after_worker_finishes(monkeypatch):
+    monkeypatch.setenv("SLACK_STATUS_MIN_DISPLAY_SECONDS", "0")
+    slack = FakeSlackClient()
+    handler = MessageHandler(slack, FakeConversationManager(), CallbackLLM())
+
+    await handler.process_message(
+        {
+            "type": "message",
+            "channel": "D123",
+            "user": "U123",
+            "text": "hello",
+            "ts": "123.45",
+        }
+    )
+
+    assert slack.calls == [
+        ("send", ":information_source: _Searching knowledge base..._", "123.45"),
+        ("update", "working", "status-ts"),
+        ("send", "finished", "123.45"),
+        ("delete", None, "status-ts"),
+    ]
