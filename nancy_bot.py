@@ -31,6 +31,14 @@ class NancyBot:
 
         # Initialize Slack client
         self.slack_client = SlackClient(self.base_dir)
+        self.allow_unsigned_slack_requests = os.environ.get(
+            "SLACK_ALLOW_UNSIGNED_REQUESTS", ""
+        ).strip().lower() in {"1", "true", "yes"}
+        if self.allow_unsigned_slack_requests:
+            logger.warning(
+                "Unsigned Slack requests are enabled. "
+                "Use SLACK_ALLOW_UNSIGNED_REQUESTS only in local tests or CI."
+            )
 
         # Initialize AI services (do NOT instantiate heavy in-process RAG here)
         # LLMService will prefer an MCP adapter when MCP_BASE_URL is set, or accept an injected rag_service.
@@ -48,6 +56,26 @@ class NancyBot:
             self.base_dir,
             self.message_handler,
         )
+
+    def _is_valid_slack_request(self, request: web.Request, body: str) -> bool:
+        """Verify a Slack request, failing closed outside explicit test mode."""
+        if self.allow_unsigned_slack_requests:
+            return True
+
+        verifier = self.slack_client.signature_verifier
+        if verifier is None:
+            logger.error(
+                "Rejecting Slack request because SLACK_SIGNING_SECRET is not configured"
+            )
+            return False
+
+        timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
+        signature = request.headers.get("X-Slack-Signature", "")
+        if not verifier.is_valid(body, timestamp, signature):
+            logger.warning("Rejected Slack request with an invalid signature")
+            return False
+
+        return True
 
     def _spawn(self, coro, *, name: str):
         """Run a coroutine in the background and log exceptions.
@@ -69,26 +97,16 @@ class NancyBot:
     async def handle_event(self, request: web.Request) -> web.Response:
         """Handle Slack events via HTTP"""
         body = await request.text()
-        timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
-        signature = request.headers.get("X-Slack-Signature", "")
-        
-        logger.info(f"Received request: body={body[:100]}...")
-        logger.info(f"Headers - timestamp: {timestamp}, signature: {signature}")
+        if not self._is_valid_slack_request(request, body):
+            return web.Response(status=401, text="Invalid Slack signature")
         
         try:
             data = json.loads(body)
             
-            # Handle URL verification challenge - allow this through without signature verification
+            # Slack signs URL verification challenges like every other event.
             if data.get("type") == "url_verification":
                 logger.info("Handling URL verification challenge")
                 return web.Response(text=data["challenge"])
-            
-            # For other events, verify request is from Slack (if we have a verifier)
-            # Temporarily disable signature verification for testing
-            # if self.slack_client.signature_verifier and not self.slack_client.signature_verifier.is_valid(body, timestamp, signature):
-            #     logger.error("Invalid signature verification")
-            #     return web.Response(status=401, text="Invalid signature")
-            logger.info("Signature verification temporarily disabled for testing")
             
             # Handle actual events
             if data.get("type") == "event_callback":
@@ -114,6 +132,8 @@ class NancyBot:
     async def handle_interactive(self, request: web.Request) -> web.Response:
         """Handle Slack interactive components (buttons, modals, etc.)"""
         body = await request.text()
+        if not self._is_valid_slack_request(request, body):
+            return web.Response(status=401, text="Invalid Slack signature")
         
         try:
             # Interactive payloads come as form data with a 'payload' field
@@ -139,6 +159,9 @@ class NancyBot:
     async def handle_command(self, request: web.Request) -> web.Response:
         """Handle Slack slash commands (e.g., /status)"""
         body = await request.text()
+        if not self._is_valid_slack_request(request, body):
+            return web.Response(status=401, text="Invalid Slack signature")
+
         try:
             parsed = urllib.parse.parse_qs(body)
             command = parsed.get('command', [''])[0]

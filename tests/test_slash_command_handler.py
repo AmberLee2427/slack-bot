@@ -17,7 +17,14 @@ slack_async.AsyncWebClient = type(
     {"__init__": lambda self, *a, **k: None, "auth_test": lambda self: {"user_id": "U_TEST"}},
 )
 slack_signature = types.ModuleType("slack_sdk.signature")
-slack_signature.SignatureVerifier = type("SignatureVerifier", (), {"__init__": lambda self, *a, **k: None})
+slack_signature.SignatureVerifier = type(
+    "SignatureVerifier",
+    (),
+    {
+        "__init__": lambda self, *a, **k: None,
+        "is_valid": lambda self, body, timestamp, signature: signature == "valid",
+    },
+)
 slack_web.async_client = slack_async
 slack_pkg.web = slack_web
 slack_pkg.signature = slack_signature
@@ -45,6 +52,7 @@ async def app_client(monkeypatch):
     monkeypatch.setattr("nancy_bot.LLMService", DummyLLMService)
     monkeypatch.setattr("nancy_bot.NancyBot._attempt_reconnect", lambda self: (True, "reconnected (test)"))
     monkeypatch.delenv("MCP_BASE_URL", raising=False)
+    monkeypatch.setenv("SLACK_ALLOW_UNSIGNED_REQUESTS", "true")
     app = await create_app()
     server = TestServer(app)
     await server.start_server()
@@ -119,3 +127,46 @@ async def test_mcp_api_key_issues_key(app_client, monkeypatch):
 
     assert resp.status == 200
     assert "nb_test_key" in body.get("text", "")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("path", "body", "content_type"),
+    [
+        ("/slack/events", '{"type":"url_verification","challenge":"test"}', "application/json"),
+        ("/slack/interactive", "payload=%7B%7D", "application/x-www-form-urlencoded"),
+        ("/slack/commands", "command=%2Fstatus&user_id=U123", "application/x-www-form-urlencoded"),
+    ],
+)
+async def test_slack_routes_reject_unsigned_requests(
+    app_client, path, body, content_type
+):
+    app_client.server.app["bot"].allow_unsigned_slack_requests = False
+
+    resp = await app_client.post(
+        path,
+        data=body,
+        headers={"Content-Type": content_type},
+    )
+
+    assert resp.status == 401
+    assert await resp.text() == "Invalid Slack signature"
+
+
+@pytest.mark.asyncio
+async def test_slack_route_accepts_valid_signature(app_client):
+    bot = app_client.server.app["bot"]
+    bot.allow_unsigned_slack_requests = False
+    bot.slack_client.signature_verifier = slack_signature.SignatureVerifier("test")
+
+    resp = await app_client.post(
+        "/slack/commands",
+        data="command=%2Fstatus&user_id=U123",
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-Slack-Request-Timestamp": "test",
+            "X-Slack-Signature": "valid",
+        },
+    )
+
+    assert resp.status == 200

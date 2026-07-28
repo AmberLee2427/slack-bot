@@ -42,7 +42,9 @@ class SlackClient:
             self.signature_verifier = SignatureVerifier(signing_secret)
             logger.info("Slack signature verifier initialized")
         else:
-            logger.warning("No SLACK_SIGNING_SECRET found - signature verification disabled")
+            logger.error(
+                "No SLACK_SIGNING_SECRET found - Slack requests will be rejected"
+            )
             self.signature_verifier = None
     
     async def get_bot_user_id(self) -> str:
