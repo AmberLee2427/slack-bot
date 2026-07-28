@@ -5,8 +5,7 @@ Handles message processing and response generation
 
 import asyncio
 import logging
-import queue
-import threading
+import os
 from typing import Dict, Any, List, Callable, Optional
 
 logger = logging.getLogger(__name__)
@@ -332,13 +331,15 @@ class MessageHandler:
                 ":information_source: _Searching knowledge base..._", original_ts
             )
 
-            # Create a queue to collect messages from the LLM thread
-            message_queue = queue.Queue()
-
             # Run the LLM service in a thread pool
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
+            message_queue = asyncio.Queue()
+            response_timeout = float(
+                os.environ.get("LLM_RESPONSE_TIMEOUT_SECONDS", "300")
+            )
+            deadline = loop.time() + response_timeout
 
-            # Create a callback that the LLM service can use to queue messages
+            # The LLM runs in a worker thread, so enqueue callbacks on the event loop.
             def sync_callback(
                 message: str, is_final: bool = False, hit_turn_limit: bool = False
             ):
@@ -346,9 +347,12 @@ class MessageHandler:
                     f"Callback received: is_final={is_final}, hit_turn_limit={hit_turn_limit}, message='{message[:100]}...'"
                 )
                 try:
-                    message_queue.put((message, is_final, hit_turn_limit))
+                    loop.call_soon_threadsafe(
+                        message_queue.put_nowait,
+                        (message, is_final, hit_turn_limit),
+                    )
                     logger.info("Message queued successfully")
-                except Exception as e:
+                except RuntimeError as e:
                     logger.error(f"Error queuing message: {e}", exc_info=True)
 
             # Start the LLM processing in a separate thread
@@ -362,23 +366,29 @@ class MessageHandler:
                 user_id,  # Pass user_id for rate limiting
             )
 
-            # Process messages from the queue as they arrive
+            # Process messages until the worker exits or the request deadline expires.
             while True:
+                if llm_future.done() and message_queue.empty():
+                    break
+
+                remaining = deadline - loop.time()
+                if remaining <= 0:
+                    llm_future.cancel()
+                    raise asyncio.TimeoutError(
+                        f"LLM response exceeded {response_timeout:.0f} seconds"
+                    )
+
                 try:
-                    # Check for new messages with a timeout
-                    logger.info("Checking for queued messages...")
-                    message, is_final, hit_turn_limit = message_queue.get(timeout=0.1)
+                    message, is_final, hit_turn_limit = await asyncio.wait_for(
+                        message_queue.get(), timeout=min(1.0, remaining)
+                    )
                     logger.info(
                         f"Processing queued message: is_final={is_final}, hit_turn_limit={hit_turn_limit}"
                     )
                     await send_callback(message, original_ts, is_final, hit_turn_limit)
                     logger.info("Message sent successfully")
                     message_queue.task_done()
-                except queue.Empty:
-                    # Check if the LLM processing is done
-                    if llm_future.done():
-                        logger.info("LLM processing completed")
-                        break
+                except asyncio.TimeoutError:
                     continue
                 except Exception as e:
                     logger.error(f"Error processing message: {e}", exc_info=True)
@@ -386,7 +396,7 @@ class MessageHandler:
             # Process any remaining messages
             logger.info("Processing any remaining messages...")
             while not message_queue.empty():
-                message, is_final, hit_turn_limit = message_queue.get()
+                message, is_final, hit_turn_limit = await message_queue.get()
                 logger.info(
                     f"Processing remaining message: is_final={is_final}, hit_turn_limit={hit_turn_limit}"
                 )
@@ -396,6 +406,14 @@ class MessageHandler:
             # Wait for the LLM to complete
             await llm_future
 
+        except asyncio.TimeoutError as e:
+            logger.error("LLM response timed out: %s", e)
+            await send_callback(
+                "Sorry, the response timed out before Nancy finished processing it.",
+                original_ts,
+                is_final=True,
+                hit_turn_limit=False,
+            )
         except Exception as e:
             logger.error(f"Error generating response: {e}")
             await send_callback(

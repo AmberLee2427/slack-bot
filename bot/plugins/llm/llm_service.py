@@ -108,7 +108,12 @@ class LLMService:
         from bot.plugins.rag.mcp_adapter import MCPRAGAdapter
 
         try:
-            self.rag = MCPRAGAdapter(MCP_BASE_URL, api_key=MCP_API_KEY)
+            mcp_timeout = int(os.environ.get("MCP_TIMEOUT_SECONDS", "30"))
+            self.rag = MCPRAGAdapter(
+                MCP_BASE_URL,
+                api_key=MCP_API_KEY,
+                timeout=mcp_timeout,
+            )
             # Health check
             health_url = MCP_BASE_URL.rstrip("/") + "/health"
             health_headers = {}

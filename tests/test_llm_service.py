@@ -10,9 +10,15 @@ from bot.plugins.llm.llm_service import LLMService
 
 
 class DummyAdapter:
-    def __init__(self, base_url: str, api_key: str | None = None):
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str | None = None,
+        timeout: int = 5,
+    ):
         self.base_url = base_url
         self.api_key = api_key
+        self.timeout = timeout
         self._docs = [{"id": "doc1", "text": "hello world", "score": 0.9}]
         self.embeddings = SimpleNamespace(database=self)
 
@@ -70,9 +76,25 @@ def test_llm_service_initializes_with_mock_adapter(monkeypatch, _mock_env):
     )
 
     assert llm.rag_status.get("available") is True
+    assert llm.rag.timeout == 30
     assert llm.get_initial_context("ping").startswith("context for ping")
     assert llm.all_indexed_files == ["doc1"]
     assert llm.indexed_file_map["doc1"] == "hello world"
+
+
+def test_llm_service_uses_configured_mcp_timeout(monkeypatch, _mock_env):
+    monkeypatch.setenv("MCP_TIMEOUT_SECONDS", "45")
+    monkeypatch.setattr("bot.plugins.rag.mcp_adapter.MCPRAGAdapter", DummyAdapter)
+    monkeypatch.setattr(
+        "bot.plugins.llm.llm_service.requests.get", lambda *_, **__: FakeResp()
+    )
+
+    llm = LLMService(
+        system_prompt=_mock_env["prompt"],
+        model_weights_path=_mock_env["weights"],
+    )
+
+    assert llm.rag.timeout == 45
 
 
 def _bare_service(custom_enabled: bool = True) -> LLMService:
