@@ -49,7 +49,7 @@ class LLMService:
         if system_prompt is None:
             system_prompt = nancy_base / "bot/plugins/llm/system_prompt.txt"
         if model_weights_path is None:
-            model_weights_path = nancy_base / "config" / "model_weights.yaml"
+            model_weights_path = nancy_base / "bot/config/model_weights.yaml"
 
         # Set rate limit from environment if not specified
         if daily_rate_limit is None:

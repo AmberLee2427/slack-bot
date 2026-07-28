@@ -150,6 +150,7 @@ knowledge_base/embeddings/models/
 # Local stuff
 bot/config/.env
 config/model_weights.yaml  # Dynamic learning weights from Nancy's WEIGHT: tool
+bot/config/model_weights.yaml  # Docker-persisted WEIGHT tool audit copy
 .env
 ref/arXiv-2510.18234v1
 *GEMINI.md
