@@ -1,5 +1,12 @@
 # Nancy Project TODO
 
+## Before Shelving / RGES-PIT Fork
+- [ ] Let the current 90,715-document no-summary build finish; verify available disk space and atomically promote the completed index.
+- [ ] Make RETRIEVE fully index-backed, including line ranges and batch retrieval, so the runtime host can operate without `knowledge_base/raw`.
+- [ ] Rerun the fixed WEIGHT / RETRIEVE / TREE smoke test after the index swap.
+- [ ] Evaluate SEARCH on a small set of known-answer project queries after the full index and summaries are installed; do not tune against the current small index.
+- [ ] Package a runtime-only KB artifact (embeddings, summary cache, weights, manifests/config) for transfer from a larger build host to the NUC.
+
 ## Slack
 - [x] connect
 - [x] test
@@ -161,4 +168,8 @@
 - [ ] App Home: inject live MCP/RAG health block
 - [ ] Periodic MCP health polling + status refresh
 - [ ] Validate NancyGPT + Actions against hosted MCP
-- [ ] Resolve retrieve/tree/search reliability edge cases
+- [-] Resolve retrieve/tree/search reliability edge cases
+  - [x] TREE enumerates indexed IDs, normalizes paths, and works without raw files.
+  - [x] RETRIEVE resolves short and storage-prefixed document IDs.
+  - [ ] RETRIEVE line ranges and batches work from indexed chunks without raw files.
+  - [ ] SEARCH relevance is evaluated after the complete KB is installed.
