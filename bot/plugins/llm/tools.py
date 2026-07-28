@@ -169,9 +169,29 @@ def weight_tool(
     meta_prompt = f"\n\nModel reweighting:"
     for line in lines:
         if "WEIGHT:" in line:
-            parts = line.split("WEIGHT:")[1].strip().split()
-            path = parts[0].rstrip("]")
-            score_multiplier = float(parts[1].rstrip("]")) if len(parts) > 1 else 1.0
+            spec = line.split("WEIGHT:", 1)[1].strip()
+            spec = spec.strip("`[]() ")
+            match = re.fullmatch(
+                r"(?P<path>\S+?)(?:\s*,\s*|\s+)"
+                r"(?P<multiplier>[+-]?(?:\d+(?:\.\d*)?|\.\d+))",
+                spec,
+            )
+            if not match:
+                meta_prompt += (
+                    f"\nInvalid WEIGHT request: {line.strip()}. "
+                    "Use [WEIGHT: <file_path>, <number from 0.5 to 2.0>]."
+                )
+                continue
+
+            path = match.group("path").strip("`'\"").rstrip(",")
+            score_multiplier = float(match.group("multiplier"))
+            if not path or not 0.5 <= score_multiplier <= 2.0:
+                meta_prompt += (
+                    f"\nInvalid WEIGHT request: {line.strip()}. "
+                    "The multiplier must be between 0.5 and 2.0."
+                )
+                continue
+
             model_weights[path] = score_multiplier
             # Forward to MCP server so weights take effect server-side
             if getattr(self, "rag", None) and hasattr(self.rag, "set_weight"):

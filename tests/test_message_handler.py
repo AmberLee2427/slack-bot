@@ -30,6 +30,21 @@ class StalledLLM:
         time.sleep(0.2)
 
 
+class SlowLLM:
+    def call_llm_with_callback(
+        self,
+        query,
+        callback,
+        conversation_history,
+        thread_ts,
+        user_id,
+    ):
+        import time
+
+        time.sleep(0.08)
+        callback("finished", True)
+
+
 @pytest.mark.asyncio
 async def test_llm_thread_callbacks_are_delivered():
     handler = MessageHandler(None, None, CallbackLLM())
@@ -63,3 +78,23 @@ async def test_stalled_llm_returns_visible_timeout(monkeypatch):
         True,
         False,
     )
+
+
+@pytest.mark.asyncio
+async def test_slow_llm_emits_working_heartbeat(monkeypatch):
+    monkeypatch.setenv("SLACK_WORKING_UPDATE_SECONDS", "0.02")
+    handler = MessageHandler(None, None, SlowLLM())
+    delivered = []
+
+    async def send(message, thread_ts, is_final=False, hit_turn_limit=False):
+        delivered.append((message, is_final, hit_turn_limit))
+
+    await handler.generate_response_with_updates("query", send, "123.45")
+
+    heartbeats = [
+        message
+        for message, is_final, _ in delivered
+        if not is_final and "Still working" in message
+    ]
+    assert len(heartbeats) >= 2
+    assert delivered[-1] == ("finished", True, False)

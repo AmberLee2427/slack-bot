@@ -104,12 +104,30 @@ class MessageHandler:
                     return
 
                 # Create a callback for sending intermediate messages
+                status_ts = None
+
                 async def send_message(
                     text: str,
                     thread_ts: str = None,
                     is_final: bool = False,
                     hit_turn_limit: bool = False,
                 ):
+                    nonlocal status_ts
+
+                    if is_final and status_ts:
+                        try:
+                            await self.slack_client.delete_message(
+                                channel=channel,
+                                ts=status_ts,
+                            )
+                        except Exception as exc:
+                            logger.warning(
+                                "Unable to remove working status %s: %s",
+                                status_ts,
+                                exc,
+                            )
+                        status_ts = None
+
                     if is_final and hit_turn_limit:
                         # Only show "Keep Cooking" button when Nancy actually hit the turn limit
                         blocks = [
@@ -149,18 +167,38 @@ class MessageHandler:
                             thread_ts=thread_ts or event.get("ts"),
                         )
                     else:
-                        # Send system/status messages using Block Kit context
+                        # Keep one live status message instead of filling the thread.
                         blocks = [
                             {
                                 "type": "context",
                                 "elements": [{"type": "mrkdwn", "text": text}],
                             }
                         ]
-                        await self.slack_client.send_message(
+                        if status_ts:
+                            try:
+                                await self.slack_client.update_message(
+                                    channel=channel,
+                                    ts=status_ts,
+                                    text=text,
+                                    blocks=blocks,
+                                )
+                                return
+                            except Exception as exc:
+                                logger.warning(
+                                    "Unable to update working status %s: %s",
+                                    status_ts,
+                                    exc,
+                                )
+                                status_ts = None
+
+                        response = await self.slack_client.send_message(
                             channel=channel,
+                            text=text,
                             blocks=blocks,
                             thread_ts=thread_ts or event.get("ts"),
                         )
+                        if response:
+                            status_ts = response.get("ts")
 
                 # Generate response using RAG + LLM with callback
                 # First, get conversation history for context
@@ -337,7 +375,12 @@ class MessageHandler:
             response_timeout = float(
                 os.environ.get("LLM_RESPONSE_TIMEOUT_SECONDS", "300")
             )
+            heartbeat_interval = float(
+                os.environ.get("SLACK_WORKING_UPDATE_SECONDS", "15")
+            )
             deadline = loop.time() + response_timeout
+            started_at = loop.time()
+            next_heartbeat = started_at + heartbeat_interval
 
             # The LLM runs in a worker thread, so enqueue callbacks on the event loop.
             def sync_callback(
@@ -379,16 +422,35 @@ class MessageHandler:
                     )
 
                 try:
+                    wait_timeout = min(1.0, remaining)
+                    if heartbeat_interval > 0:
+                        wait_timeout = min(
+                            wait_timeout,
+                            max(0.01, next_heartbeat - loop.time()),
+                        )
                     message, is_final, hit_turn_limit = await asyncio.wait_for(
-                        message_queue.get(), timeout=min(1.0, remaining)
+                        message_queue.get(), timeout=wait_timeout
                     )
                     logger.info(
                         f"Processing queued message: is_final={is_final}, hit_turn_limit={hit_turn_limit}"
                     )
                     await send_callback(message, original_ts, is_final, hit_turn_limit)
+                    if not is_final and heartbeat_interval > 0:
+                        next_heartbeat = loop.time() + heartbeat_interval
                     logger.info("Message sent successfully")
                     message_queue.task_done()
                 except asyncio.TimeoutError:
+                    if (
+                        heartbeat_interval > 0
+                        and loop.time() >= next_heartbeat
+                        and not llm_future.done()
+                    ):
+                        elapsed = int(loop.time() - started_at)
+                        await send_callback(
+                            f":hourglass_flowing_sand: _Still working... {elapsed}s elapsed_",
+                            original_ts,
+                        )
+                        next_heartbeat = loop.time() + heartbeat_interval
                     continue
                 except Exception as e:
                     logger.error(f"Error processing message: {e}", exc_info=True)
