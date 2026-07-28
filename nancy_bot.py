@@ -71,7 +71,20 @@ class NancyBot:
 
         timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
         signature = request.headers.get("X-Slack-Signature", "")
-        if not verifier.is_valid(body, timestamp, signature):
+        if not timestamp or not signature:
+            logger.warning("Rejected Slack request with missing signature headers")
+            return False
+
+        try:
+            is_valid = verifier.is_valid(body, timestamp, signature)
+        except Exception:
+            logger.warning(
+                "Rejected Slack request because signature verification failed",
+                exc_info=True,
+            )
+            return False
+
+        if not is_valid:
             logger.warning("Rejected Slack request with an invalid signature")
             return False
 

@@ -170,3 +170,26 @@ async def test_slack_route_accepts_valid_signature(app_client):
     )
 
     assert resp.status == 200
+
+
+@pytest.mark.asyncio
+async def test_slack_route_rejects_verifier_exception(app_client):
+    class BrokenVerifier:
+        def is_valid(self, body, timestamp, signature):
+            raise ValueError("malformed timestamp")
+
+    bot = app_client.server.app["bot"]
+    bot.allow_unsigned_slack_requests = False
+    bot.slack_client.signature_verifier = BrokenVerifier()
+
+    resp = await app_client.post(
+        "/slack/commands",
+        data="command=%2Fstatus&user_id=U123",
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-Slack-Request-Timestamp": "malformed",
+            "X-Slack-Signature": "invalid",
+        },
+    )
+
+    assert resp.status == 401
