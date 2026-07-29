@@ -9,9 +9,10 @@ This page deliberately contains only safe operational entry points.
 | Hosted documentation | `https://nancy.rges-pit.com` |
 | MCP and HTTP API | `https://mcp.rges-pit.com` |
 | Health check | `https://mcp.rges-pit.com/health` |
+| Administrative interface | `https://nancy-admin.rges-pit.com` |
 
-The administrative interface is restricted to service operators and is not
-part of the public user workflow.
+The administrative interface requires operator authentication and is not part
+of the public user workflow.
 
 ## Package and deployment sources
 
@@ -21,4 +22,3 @@ part of the public user workflow.
 
 Hosted-service access, account, or corpus questions should go to the Nancy
 administrators rather than the package issue tracker.
-
