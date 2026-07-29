@@ -1,12 +1,21 @@
-# Microlensing context, on demand
-
-Nancy is a shared, searchable knowledge base for microlensing software,
-documentation, tutorials, notebooks, and literature. Connect it to an
-MCP-capable assistant and ask questions in the environment where you already
-work.
-
-[:material-connection: Connect from VS Code](connect/vscode.md){ .md-button .md-button--primary }
-[:material-console: Connect from Codex](connect/codex.md){ .md-button }
+<section class="nb-hero">
+  <div class="nb-hero__copy">
+    <p class="nb-eyebrow">RGES-PIT · Shared research infrastructure</p>
+    <h1><span>Microlensing context,</span><span>on demand.</span></h1>
+    <p class="nb-lede">
+      Nancy is a searchable knowledge base for microlensing software,
+      documentation, tutorials, notebooks, and literature. Connect it to an
+      MCP-capable assistant and ask questions where you already work.
+    </p>
+    <div class="nb-actions">
+      <a class="md-button md-button--primary" href="connect/vscode/">Connect from VS Code</a>
+      <a class="md-button" href="connect/codex/">Connect from Codex</a>
+    </div>
+  </div>
+  <div class="nb-hero__mark" aria-hidden="true">
+    <img src="assets/nancy-brain2.png" alt="">
+  </div>
+</section>
 
 ## What you need
 
@@ -41,9 +50,21 @@ repository, paste it into a shared configuration file, or post it in Slack.
 Nancy exposes knowledge-base tools, not a language model. Your chosen AI client
 decides how to use the returned evidence and generates the answer.
 
+<aside class="nb-origin">
+  <img src="assets/nancy-portrait.png" alt="Illustrated portrait of Nancy Grace Roman">
+  <div>
+    <p class="nb-eyebrow">Why Nancy?</p>
+    <h2>Built for the Roman microlensing community.</h2>
+    <p>
+      Nancy is named for astronomer Nancy Grace Roman. The service keeps
+      microlensing references close at hand while leaving interpretation and
+      scientific judgment with the researcher.
+    </p>
+  </div>
+</aside>
+
 ## Building your own knowledge base
 
 This site documents the shared microlensing service. To build, configure, or
 self-host a different knowledge base, use the
 [Nancy Brain package documentation](https://nancy-docs.malpas.nz/).
-

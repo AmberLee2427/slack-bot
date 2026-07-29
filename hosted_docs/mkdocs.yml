@@ -6,18 +6,20 @@ docs_dir: docs
 
 theme:
   name: material
+  logo: assets/nancy-brain2.png
+  favicon: assets/nancy-brain2.png
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
-      accent: amber
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-night
         name: Use dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: indigo
-      accent: amber
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-sunny
         name: Use light mode
@@ -55,4 +57,3 @@ nav:
     - HTTP API: http-api.md
     - Privacy: privacy.md
   - Operators: operators.md
-
