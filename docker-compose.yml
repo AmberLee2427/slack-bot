@@ -69,6 +69,7 @@ services:
       - ./ref/nancy-brain/nancy_brain:/app/nancy_brain
       - ./ref/nancy-brain/rag_core:/app/rag_core
       - ./ref/nancy-brain/scripts:/app/scripts
+      - ./ref/nancy-brain/site:/app/site:ro
       - nancy-brain-cache:/app/cache
     command: streamlit run nancy_brain/admin_ui.py --server.port 8501 --server.address 0.0.0.0 --server.enableCORS false --server.enableXsrfProtection false
     restart: unless-stopped
