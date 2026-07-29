@@ -22,7 +22,8 @@ accepted.
 
 Apply a personal multiplier from `0.5` to `2.0` to influence subsequent search
 ranking. Weighting is useful when a toolkit, tutorial, or paper is especially
-authoritative for your work.
+authoritative for your work. Preferences are stored against a one-way hash of
+your API key and do not change another user's ranking.
 
 ## Status
 
@@ -36,4 +37,3 @@ and cite source paths. For example:
 
 > Search Nancy for finite-source point-lens parallax fitting. Retrieve the most
 > relevant tutorial and implementation passages, then answer with source paths.
-

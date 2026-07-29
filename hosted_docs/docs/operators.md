@@ -14,6 +14,13 @@ This page deliberately contains only safe operational entry points.
 The administrative interface requires operator authentication and is not part
 of the public user workflow.
 
+## Traffic controls
+
+The hosted service defaults to 600 requests per minute per API key, 1,200
+requests per minute per source IP, and five API-key issuances per hour per
+source IP. Health checks are exempt. Personal API keys cannot trigger index
+rebuilds.
+
 ## Package and deployment sources
 
 - [Nancy Brain package](https://github.com/AmberLee2427/nancy-brain)
