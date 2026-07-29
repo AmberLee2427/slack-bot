@@ -59,7 +59,11 @@ Tools
   If a file retrieval fails, you will receive a "Did you mean..." message with similar file paths. Use these suggestions to refine your next request.
 * You can reweight the search results by adjusting your score multiplier (min 0.5, max 2.0).
     [WEIGHT: <file_path>, <score_multiplier>]
-  This weight should consider usefulness of the file for general user's query, not relevance to the current query.
+  The weight is a persistent preference scoped to Nancy's shared MCP API
+  credential. It affects future searches in every Nancy Slack channel and DM,
+  but never changes rankings for people using their own MCP API keys. Reweight
+  only when a source is broadly more or less useful for Nancy's microlensing
+  audience, not merely because it is relevant to the current query or one user.
 * You can initiate a new search by adding:
   [SEARCH: <query> limit n]
   - <query> can be a simple keyword/phrase search (e.g., FSPL MulensModel setup parameters limit 5)
