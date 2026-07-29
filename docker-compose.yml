@@ -78,6 +78,16 @@ services:
     networks:
       - nancy-network
 
+  # Public documentation for users of the hosted microlensing MCP.
+  nancy-docs:
+    build:
+      context: .
+      dockerfile: hosted_docs/Dockerfile
+    container_name: nancy-hosted-docs
+    restart: unless-stopped
+    networks:
+      - nancy-network
+
   # Nancy Slack Bot
   nancy-bot:
     build:
