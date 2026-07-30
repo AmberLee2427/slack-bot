@@ -66,7 +66,13 @@ class MCPRAGAdapter:
     attributes they expect from the legacy RAGService.
     """
 
-    def __init__(self, base_url: str, api_key: Optional[str] = None, timeout: int = 5, session: Optional[requests.Session] = None):
+    def __init__(
+        self,
+        base_url: str,
+        api_key: Optional[str] = None,
+        timeout: int = 30,
+        session: Optional[requests.Session] = None,
+    ):
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
         self._logger = logging.getLogger(__name__)
@@ -197,4 +203,3 @@ class MCPRAGAdapter:
         except Exception as exc:
             self._logger.error("MCP set_weight failed: %s", exc)
             raise MCPAdapterError(exc)
-

@@ -59,6 +59,12 @@ def test_search_normalizes_fields():
     assert "score" in results[0]
 
 
+def test_default_timeout_allows_cold_index_searches():
+    adapter = MCPRAGAdapter("http://mcp.local", session=FakeSession())
+
+    assert adapter.timeout == 30
+
+
 def test_get_context_for_query_joins_text():
     import sys
     sess = FakeSession()
