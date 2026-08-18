@@ -104,9 +104,21 @@ def _bare_service(custom_enabled: bool = True) -> LLMService:
     llm.custom_model = "agents-a1" if custom_enabled else None
     llm.custom_url = "https://api.example.test/v1" if custom_enabled else ""
     llm.custom_enabled = custom_enabled
+    llm.llm_provider = "anthropic"
     llm.force_custom_fallback = False
     llm.rate_limiter = MagicMock()
     return llm
+
+
+def test_explicit_custom_provider_bypasses_anthropic_quota():
+    llm = _bare_service()
+    llm.llm_provider = "custom"
+
+    provider, message = llm._provider_for_interaction("U123")
+
+    assert provider == "custom"
+    assert message is None
+    llm.rate_limiter.check_and_increment.assert_not_called()
 
 
 def test_quota_exhaustion_selects_custom_provider():

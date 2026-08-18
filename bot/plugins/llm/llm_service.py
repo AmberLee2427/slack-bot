@@ -22,6 +22,7 @@ CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-5")
 CUSTOM_API_KEY = os.environ.get("CUSTOM_API_KEY")
 CUSTOM_MODEL = os.environ.get("CUSTOM_MODEL")
 CUSTOM_URL = os.environ.get("CUSTOM_URL", "").rstrip("/")
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "anthropic").strip().lower()
 DEBUG_LLM = os.environ.get("DEBUG_LLM", "False").lower() in ("true", "1", "yes")
 DAILY_RATE_LIMIT = int(
     os.environ.get("DAILY_RATE_LIMIT", "100")
@@ -71,6 +72,13 @@ class LLMService:
         self.custom_enabled = bool(
             self.custom_api_key and self.custom_model and self.custom_url
         )
+        self.llm_provider = os.environ.get("LLM_PROVIDER", LLM_PROVIDER).strip().lower()
+        if self.llm_provider not in {"anthropic", "custom"}:
+            raise RuntimeError("LLM_PROVIDER must be either 'anthropic' or 'custom'")
+        if self.llm_provider == "custom" and not self.custom_enabled:
+            raise RuntimeError(
+                "LLM_PROVIDER=custom requires CUSTOM_API_KEY, CUSTOM_MODEL, and CUSTOM_URL"
+            )
         self.force_custom_fallback = False
         self.update_weights()
 
@@ -91,9 +99,11 @@ class LLMService:
             f"LLM Service initialized with debugging={'ON' if self.debugging else 'OFF'}"
         )
         logger.info(f"Daily rate limit set to: {daily_rate_limit} queries per user")
-        logger.info("Primary LLM model: %s", CLAUDE_MODEL)
+        logger.info("Primary LLM provider: %s", self.llm_provider)
+        if self.llm_provider == "anthropic":
+            logger.info("Primary LLM model: %s", CLAUDE_MODEL)
         if self.custom_enabled:
-            logger.info("Custom fallback LLM model: %s", self.custom_model)
+            logger.info("Custom LLM model: %s", self.custom_model)
 
         # RAG backend: require MCPRAGAdapter, fail fast if not configured
         MCP_BASE_URL = os.environ.get("MCP_BASE_URL")
@@ -355,6 +365,9 @@ class LLMService:
         self, user_id: str = None
     ) -> tuple[str | None, str | None]:
         """Select one provider for an entire agent interaction."""
+        if self.llm_provider == "custom":
+            return "custom", None
+
         if not user_id:
             return "anthropic", None
 
@@ -457,13 +470,15 @@ class LLMService:
         logger = logging.getLogger(__name__)
 
         try:
-            active_provider = (
-                "custom"
-                if provider == "anthropic"
+            active_provider = provider
+            if self.llm_provider == "custom":
+                active_provider = "custom"
+            elif (
+                provider == "anthropic"
                 and self.force_custom_fallback
                 and self.custom_enabled
-                else provider
-            )
+            ):
+                active_provider = "custom"
             logger.info("Making %s API request for turn %s", active_provider, turn)
             if self.debugging:
                 logger.info(f"Request payload: {json.dumps(payload, indent=2)}")
