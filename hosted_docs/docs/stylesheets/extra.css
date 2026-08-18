@@ -1,0 +1,21 @@
+:root {
+  --md-primary-fg-color: #263b64;
+  --md-accent-fg-color: #c77b16;
+}
+
+.md-header {
+  background:
+    linear-gradient(110deg, rgba(38, 59, 100, 0.96), rgba(13, 104, 121, 0.92));
+}
+
+.md-main {
+  background-image:
+    radial-gradient(circle at 8% 12%, rgba(199, 123, 22, 0.08), transparent 28rem),
+    radial-gradient(circle at 92% 38%, rgba(13, 104, 121, 0.08), transparent 30rem);
+}
+
+.md-typeset h1 {
+  font-weight: 750;
+  letter-spacing: -0.03em;
+}
+

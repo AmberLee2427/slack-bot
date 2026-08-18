@@ -1,0 +1,59 @@
+site_name: Nancy Microlensing Knowledge Base
+site_description: Connect an AI assistant to the shared microlensing knowledge base
+site_url: https://nancy.rges-pit.com/
+
+docs_dir: docs
+
+theme:
+  name: material
+  logo: assets/nancy-brain2.png
+  favicon: assets/nancy-brain2.png
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Use dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Use light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra_css:
+  - stylesheets/nancy-20260729.css
+
+nav:
+  - Start Here: index.md
+  - Connect:
+    - VS Code: connect/vscode.md
+    - Codex: connect/codex.md
+    - Claude: connect/claude.md
+    - Other MCP Clients: connect/other.md
+  - Reference:
+    - Tools: tools.md
+    - HTTP API: http-api.md
+    - Privacy: privacy.md
+  - Operators: operators.md

@@ -12,6 +12,9 @@ services:
       - MCP_TRANSPORT=http
       - MCP_API_KEY=${MCP_API_KEY}
       - MCP_INVITE_CODES=${MCP_INVITE_CODES}
+      - MCP_RATE_LIMIT_PER_MINUTE=${MCP_RATE_LIMIT_PER_MINUTE:-600}
+      - MCP_IP_RATE_LIMIT_PER_MINUTE=${MCP_IP_RATE_LIMIT_PER_MINUTE:-1200}
+      - MCP_KEY_ISSUE_RATE_LIMIT_PER_HOUR=${MCP_KEY_ISSUE_RATE_LIMIT_PER_HOUR:-5}
       - NB_SECRET_KEY=${NB_SECRET_KEY}
       - NB_USE_LOCAL_SUMMARY=${NB_USE_LOCAL_SUMMARY:-false}
       - CUSTOM_API_KEY=${CUSTOM_API_KEY:-}
@@ -66,6 +69,7 @@ services:
       - ./ref/nancy-brain/nancy_brain:/app/nancy_brain
       - ./ref/nancy-brain/rag_core:/app/rag_core
       - ./ref/nancy-brain/scripts:/app/scripts
+      - ./ref/nancy-brain/site:/app/site:ro
       - nancy-brain-cache:/app/cache
     command: streamlit run nancy_brain/admin_ui.py --server.port 8501 --server.address 0.0.0.0 --server.enableCORS false --server.enableXsrfProtection false
     restart: unless-stopped
@@ -75,6 +79,16 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    networks:
+      - nancy-network
+
+  # Public documentation for users of the hosted microlensing MCP.
+  nancy-docs:
+    build:
+      context: .
+      dockerfile: hosted_docs/Dockerfile
+    container_name: nancy-hosted-docs
+    restart: unless-stopped
     networks:
       - nancy-network
 

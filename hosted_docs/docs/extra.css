@@ -1,0 +1,328 @@
+:root {
+  --nb-ink: #210b2d;
+  --nb-ink-soft: #3d1750;
+  --nb-plum: #672b78;
+  --nb-orchid: #a84496;
+  --nb-rose: #ef91b7;
+  --nb-starlight: #fff3dc;
+  --nb-paper: #fbf7f1;
+  --nb-line: rgba(70, 25, 80, 0.18);
+  --nb-shadow: 0 22px 60px rgba(33, 11, 45, 0.12);
+  --nb-display: "Avenir Next Condensed", "Gill Sans", sans-serif;
+  --nb-body: "Avenir Next", "Segoe UI", sans-serif;
+  --md-primary-fg-color: var(--nb-ink);
+  --md-primary-fg-color--light: var(--nb-plum);
+  --md-primary-fg-color--dark: #16061e;
+  --md-accent-fg-color: var(--nb-orchid);
+  --md-typeset-a-color: #7b2f7d;
+}
+
+[data-md-color-scheme="slate"] {
+  --nb-ink: #17071f;
+  --nb-ink-soft: #2d103a;
+  --nb-paper: #130d18;
+  --nb-line: rgba(255, 225, 238, 0.14);
+  --nb-shadow: 0 22px 70px rgba(0, 0, 0, 0.35);
+  --md-default-bg-color: #130d18;
+  --md-default-fg-color: rgba(255, 247, 240, 0.9);
+  --md-default-fg-color--light: rgba(255, 247, 240, 0.66);
+  --md-typeset-a-color: #f0a0c0;
+}
+
+body {
+  font-family: var(--nb-body);
+}
+
+.md-header {
+  background: rgba(27, 7, 37, 0.97);
+  border-bottom: 1px solid rgba(255, 221, 232, 0.13);
+  box-shadow: none;
+}
+
+.md-header__button.md-logo img {
+  width: 2.1rem;
+  height: 2.1rem;
+  object-fit: cover;
+  border-radius: 0.6rem;
+}
+
+.md-header__title {
+  font-family: var(--nb-display);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.md-tabs {
+  background: #32103f;
+  border-bottom: 1px solid rgba(255, 221, 232, 0.1);
+}
+
+.md-tabs__link {
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  opacity: 0.72;
+}
+
+.md-tabs__link--active,
+.md-tabs__link:hover {
+  color: var(--nb-starlight);
+  opacity: 1;
+}
+
+.md-main {
+  background:
+    linear-gradient(90deg, transparent 49.85%, rgba(121, 55, 133, 0.045) 50%, transparent 50.15%),
+    var(--nb-paper);
+  background-size: 5rem 100%;
+}
+
+.md-content {
+  min-width: 0;
+}
+
+.md-content__inner {
+  padding-top: 2.2rem;
+}
+
+.md-typeset {
+  font-size: 0.82rem;
+  line-height: 1.72;
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 {
+  font-family: var(--nb-display);
+  color: inherit;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.md-typeset h1 {
+  margin-bottom: 1.2rem;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+}
+
+.md-typeset h2 {
+  margin-top: 2.6rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--nb-line);
+}
+
+.md-typeset code {
+  border-radius: 0.25rem;
+}
+
+.md-typeset pre > code {
+  border: 1px solid var(--nb-line);
+  border-radius: 0.75rem;
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+  border: 1px solid var(--nb-line);
+  border-radius: 0.75rem;
+  box-shadow: none;
+}
+
+.md-typeset .md-button {
+  margin: 0;
+  padding: 0.72rem 1.05rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.md-typeset .md-button--primary {
+  color: #24102e;
+  background: var(--nb-starlight);
+  border-color: var(--nb-starlight);
+}
+
+.md-typeset .md-button:hover {
+  color: #24102e;
+  background: #f2b0ca;
+  border-color: #f2b0ca;
+}
+
+.nb-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(11rem, 0.55fr);
+  gap: 0.5rem;
+  align-items: center;
+  min-height: 27rem;
+  margin: -2.2rem -1.2rem 3rem;
+  padding: 4.6rem clamp(1.5rem, 5vw, 4.4rem);
+  overflow: hidden;
+  color: #fff8f0;
+  background:
+    radial-gradient(circle at 78% 36%, rgba(192, 75, 167, 0.34), transparent 22rem),
+    #210b2d;
+  border-radius: 0 0 1.4rem 1.4rem;
+  box-shadow: var(--nb-shadow);
+}
+
+.nb-hero::after {
+  position: absolute;
+  right: -8%;
+  bottom: 14%;
+  width: 58%;
+  height: 36%;
+  border: 2px solid rgba(255, 243, 220, 0.62);
+  border-color: rgba(255, 243, 220, 0.62) transparent transparent;
+  border-radius: 50%;
+  transform: rotate(-8deg);
+  content: "";
+  pointer-events: none;
+}
+
+.nb-hero__copy {
+  position: relative;
+  z-index: 2;
+}
+
+.nb-eyebrow {
+  margin: 0 0 0.8rem;
+  color: var(--nb-rose);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.nb-hero h1 {
+  max-width: none;
+  margin: 0;
+  color: #fff8f0;
+  font-size: clamp(2.8rem, 4.5vw, 3.8rem);
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.nb-hero h1 span {
+  display: block;
+  white-space: nowrap;
+}
+
+.nb-lede {
+  max-width: 42rem;
+  margin: 1.6rem 0 1.8rem;
+  color: rgba(255, 248, 240, 0.78);
+  font-size: 1rem;
+}
+
+.nb-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.nb-hero__mark {
+  position: relative;
+  z-index: 1;
+}
+
+.nb-hero__mark img {
+  display: block;
+  width: min(27rem, 125%);
+  max-width: none;
+  margin-left: -8%;
+  filter: drop-shadow(0 1.6rem 2.4rem rgba(0, 0, 0, 0.35));
+}
+
+.nb-origin {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: 1.3rem;
+  align-items: center;
+  margin: 3.2rem 0;
+  padding: 1.1rem;
+  background: rgba(168, 68, 150, 0.07);
+  border: 1px solid var(--nb-line);
+  border-radius: 1rem;
+}
+
+.nb-origin img {
+  width: 8rem;
+  height: 8rem;
+  object-fit: cover;
+  border-radius: 0.75rem;
+}
+
+.nb-origin h2 {
+  margin: 0 0 0.35rem;
+  padding: 0;
+  border: 0;
+}
+
+.nb-origin p:last-child {
+  margin-bottom: 0;
+}
+
+.md-sidebar__scrollwrap {
+  scrollbar-color: rgba(168, 68, 150, 0.4) transparent;
+}
+
+.md-nav__link--active {
+  font-weight: 700;
+}
+
+@media screen and (max-width: 76.234375em) {
+  .nb-hero {
+    margin-right: 0;
+    margin-left: 0;
+  }
+}
+
+@media screen and (max-width: 44.984375em) {
+  .md-content__inner {
+    padding-top: 0;
+  }
+
+  .nb-hero {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    margin: 0 -0.8rem 2rem;
+    padding: 3rem 1.3rem 1.5rem;
+    border-radius: 0 0 1rem 1rem;
+  }
+
+  .nb-hero__mark {
+    order: -1;
+  }
+
+  .nb-hero__mark img {
+    width: 12rem;
+    margin: -1rem auto -2rem;
+  }
+
+  .nb-hero h1 {
+    font-size: clamp(2.7rem, 15vw, 4rem);
+  }
+
+  .nb-hero h1 span {
+    white-space: normal;
+  }
+
+  .nb-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .nb-actions .md-button {
+    text-align: center;
+  }
+
+  .nb-origin {
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+  }
+
+  .nb-origin img {
+    width: 4.5rem;
+    height: 4.5rem;
+  }
+}
