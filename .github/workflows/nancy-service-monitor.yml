@@ -1,0 +1,149 @@
+name: Nancy Service Monitor
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: nancy-service-monitor
+  cancel-in-progress: true
+
+jobs:
+  monitor:
+    name: Check public services
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe Nancy endpoints
+        id: probe
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          report="${RUNNER_TEMP}/nancy-monitor-report.md"
+          failures=0
+          {
+            echo "## Nancy service monitor"
+            echo
+            echo "Checked at $(date --utc --iso-8601=seconds)."
+            echo
+          } > "$report"
+
+          check() {
+            local name="$1"
+            local url="$2"
+            local pattern="$3"
+            local body status
+            body="$(mktemp)"
+
+            status="$(curl \
+              --silent --show-error --location \
+              --connect-timeout 10 --max-time 30 \
+              --retry 2 --retry-delay 2 --retry-all-errors \
+              --output "$body" --write-out '%{http_code}' \
+              "$url" 2>>"$report")" || status="curl-error"
+
+            if [[ "$status" == "200" ]] && grep -Eiq "$pattern" "$body"; then
+              echo "- PASS: ${name} (${url})" >> "$report"
+            else
+              echo "- FAIL: ${name} (${url}); HTTP ${status}; expected content was absent" >> "$report"
+              failures=$((failures + 1))
+            fi
+            rm -f "$body"
+          }
+
+          check \
+            "Slack bot ingress and MCP dependency" \
+            "https://nancy-bot.malpas.nz/health" \
+            '"ok"[[:space:]]*:[[:space:]]*true.*"available"[[:space:]]*:[[:space:]]*true'
+          check \
+            "Nancy Brain MCP and index" \
+            "https://nancy-brain.malpas.nz/health" \
+            '"status"[[:space:]]*:[[:space:]]*"ok"'
+          check \
+            "Hosted microlensing guide" \
+            "https://nancy.rges-pit.com/" \
+            '<title>Nancy Microlensing Knowledge Base'
+          check \
+            "Nancy Brain package docs" \
+            "https://nancy-docs.malpas.nz/" \
+            '<title>Nancy Brain'
+
+          cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          echo "report=$report" >> "$GITHUB_OUTPUT"
+          if (( failures > 0 )); then
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "failed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open or update outage issue
+        if: steps.probe.outputs.failed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT: ${{ steps.probe.outputs.report }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          label="service-monitor"
+          title="[monitor] Nancy service outage"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          gh label create "$label" \
+            --repo "$GITHUB_REPOSITORY" \
+            --color D73A4A \
+            --description "Automated public service health incident" \
+            --force
+
+          issue="$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --label "$label" \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          {
+            cat "$REPORT"
+            echo
+            echo "Workflow run: ${run_url}"
+          } > "${RUNNER_TEMP}/nancy-monitor-incident.md"
+
+          if [[ -n "$issue" ]]; then
+            gh issue comment "$issue" \
+              --repo "$GITHUB_REPOSITORY" \
+              --body-file "${RUNNER_TEMP}/nancy-monitor-incident.md"
+          else
+            gh issue create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$title" \
+              --label "$label" \
+              --body-file "${RUNNER_TEMP}/nancy-monitor-incident.md"
+          fi
+
+      - name: Close recovered outage issue
+        if: steps.probe.outputs.failed == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          issue="$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --label service-monitor \
+            --json number \
+            --jq '.[0].number // empty' 2>/dev/null || true)"
+          if [[ -n "$issue" ]]; then
+            gh issue close "$issue" \
+              --repo "$GITHUB_REPOSITORY" \
+              --comment "All monitored Nancy endpoints have recovered."
+          fi
+
+      - name: Fail workflow on outage
+        if: steps.probe.outputs.failed == 'true'
+        run: exit 1
