@@ -22,6 +22,12 @@
                "url": "https://nancy-bot.malpas.nz/slack/commands",
                "description": "Issue a per-user Nancy Brain MCP API key",
                "usage_hint": ""
+           },
+           {
+               "command": "/my_quota",
+               "url": "https://nancy-bot.malpas.nz/slack/commands",
+               "description": "Show your daily Nancy Sonnet usage",
+               "usage_hint": ""
            }
        ],
     "oauth_config": {

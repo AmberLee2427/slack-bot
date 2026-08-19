@@ -2,6 +2,7 @@ import os
 
 import types
 import sys
+from unittest.mock import Mock
 
 import pytest
 import pytest_asyncio
@@ -91,6 +92,30 @@ async def test_status_reconnect_triggers_recheck(app_client):
 
     assert resp.status == 200
     assert "reconnected" in body.get("text", "")
+
+
+@pytest.mark.asyncio
+async def test_my_quota_returns_ephemeral_usage_without_incrementing(app_client):
+    rate_limiter = Mock()
+    rate_limiter.get_user_stats.return_value = {
+        "used_today": 23,
+        "daily_limit": 100,
+        "remaining": 77,
+    }
+    app_client.server.app["bot"].llm_service.rate_limiter = rate_limiter
+
+    resp = await post_form(
+        app_client,
+        {"command": "/my_quota", "user_id": "U123", "text": ""},
+    )
+    body = await resp.json()
+
+    assert resp.status == 200
+    assert body["response_type"] == "ephemeral"
+    assert "23/100" in body["text"]
+    assert "77 Sonnet queries" in body["text"]
+    rate_limiter.get_user_stats.assert_called_once_with("U123")
+    rate_limiter.check_and_increment.assert_not_called()
 
 
 @pytest.mark.asyncio

@@ -183,6 +183,35 @@ class NancyBot:
 
             logger.info(f"Slash command received: {command} text={text} user={user_id}")
 
+            if command == "/my_quota":
+                stats = self.llm_service.rate_limiter.get_user_stats(user_id)
+                used = stats["used_today"]
+                daily_limit = stats["daily_limit"]
+                remaining = stats["remaining"]
+                percentage = (used / daily_limit) * 100 if daily_limit > 0 else 0
+
+                if percentage >= 100:
+                    indicator, status = "🔄", "Using Custom Fallback"
+                elif percentage >= 90:
+                    indicator, status = "⚠️", "Almost Full"
+                elif percentage >= 70:
+                    indicator, status = "🟡", "Getting High"
+                else:
+                    indicator, status = "✅", "Looking Good"
+
+                filled = min(10, int((percentage / 100) * 10))
+                progress_bar = "█" * filled + "░" * (10 - filled)
+                resp_text = (
+                    f"{indicator} *Your Sonnet Usage Today*\n\n"
+                    f"*Status:* {status}\n"
+                    f"*Usage:* {used}/{daily_limit} Sonnet queries ({percentage:.0f}%)\n"
+                    f"*Remaining:* {remaining} Sonnet queries\n\n"
+                    f"*Progress:* `{progress_bar}` {percentage:.0f}%\n\n"
+                    "_Your Sonnet allowance resets at midnight UTC. "
+                    "Nancy remains available through the custom model._"
+                )
+                return web.json_response({"response_type": "ephemeral", "text": resp_text})
+
             # Status/health check
             if command == '/status' or command == '/health':
                 # If user asked to reconnect, attempt a hot-reconnect
