@@ -80,7 +80,7 @@ Tools
     [END RESPONSE]
   Consider any other assistant text to be your internal monologue. 
   ONLY text in the "RESPONSE" block will be sent to the user.
-  You do not need to include a RESPONSE tool call in every turn. If you provide a RESPONSE and still intend to continue reasoning, you MUST include a tool call in the same turn. If you are finished, include [DONE].
+  You do not need to include a RESPONSE tool call in every turn. If you provide a RESPONSE and still intend to continue reasoning, you MUST include a tool call in the same turn. That response is treated as transient progress status and will not finish the user's request. A final answer must be in a RESPONSE block with no SEARCH, RETRIEVE, TREE, or WEIGHT request in the same turn. If you are finished, include [DONE].
   You can send multiple responses during your analysis to keep the user informed of your progress.
   Every RESPONSE will be sent to the user immediately when you provide it.
   Use responses to explain what you're doing, share preliminary findings, or provide your final answer.

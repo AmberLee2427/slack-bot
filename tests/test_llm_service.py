@@ -248,6 +248,50 @@ def test_done_without_response_forces_final_synthesis(monkeypatch, _mock_env):
     assert "The tool phase is over" in final_payload["messages"][-1]["content"]
 
 
+def test_response_with_tool_request_is_progress_not_final(monkeypatch, _mock_env):
+    service = _initialized_service(monkeypatch, _mock_env, max_turns=2)
+    service.search_tool = MagicMock(return_value="RTModel source evidence")
+    service.querry_llm = MagicMock(
+        side_effect=[
+            (
+                "[SEARCH: RTModel FinalModels columns limit 8]\n"
+                "[BEGIN RESPONSE]Hang on, the initial results were irrelevant. "
+                "Let me inspect the RTModel source.[END RESPONSE]",
+                "turn one",
+            ),
+            (
+                "[BEGIN RESPONSE]The intervening columns are documented in "
+                "the RTModel writer.[END RESPONSE] [DONE]",
+                "turn two",
+            ),
+        ]
+    )
+    callbacks = []
+
+    service.call_llm_with_callback(
+        "What are the RTModel FinalModels columns?",
+        lambda message, is_final=False, hit_turn_limit=False: callbacks.append(
+            (message, is_final, hit_turn_limit)
+        ),
+        user_id="U123",
+    )
+
+    assert callbacks == [
+        (
+            "Hang on, the initial results were irrelevant. Let me inspect the "
+            "RTModel source.",
+            False,
+            False,
+        ),
+        (
+            "The intervening columns are documented in the RTModel writer.",
+            True,
+            False,
+        ),
+    ]
+    assert service.querry_llm.call_count == 2
+
+
 def test_failed_final_synthesis_reports_failure_not_placeholder(monkeypatch, _mock_env):
     service = _initialized_service(monkeypatch, _mock_env)
     service.querry_llm = MagicMock(

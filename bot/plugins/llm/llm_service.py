@@ -766,6 +766,10 @@ class LLMService:
 
             # --- RESPONSE tool handler ---
             # Extract the comment from the LLM response and send it
+            has_tool_request = any(
+                marker in llm_text
+                for marker in ("SEARCH:", "RETRIEVE:", "TREE:", "WEIGHT:")
+            )
             if self.debugging:
                 logger.info(f"Checking for RESPONSE in LLM text. Full text: {llm_text}")
             if "RESPONSE" in llm_text:
@@ -779,10 +783,13 @@ class LLMService:
                         if self.debugging:
                             logger.info("Sending response to callback")
                         callback_fn(
-                            response_text, True, hit_turn_limit=False
-                        )  # Mark as final response, didn't hit limit
-                        response_sent = True
-                        searching = False
+                            response_text,
+                            not has_tool_request,
+                            hit_turn_limit=False,
+                        )
+                        if not has_tool_request:
+                            response_sent = True
+                            searching = False
                         if self.debugging:
                             logger.info("Response sent to callback successfully")
                     else:
