@@ -3,7 +3,7 @@
         "name": "Nancy",
         "description": "your wise and informed microlensing guide",
         "background_color": "#590088",
-        "long_description": "Nancy is a Gemini 2.5 pro AI assistant with RAG (Retrieval Augmented Generation). She has a custom database of microlensing journal articles, code repositories, and web resources to draw from. And she keeps her receipts."
+        "long_description": "Nancy is an AI research assistant with a custom database of microlensing journal articles, code repositories, and web resources to draw from. And she keeps her receipts."
     },
     "features": {
         "app_home": {
@@ -18,14 +18,8 @@
     },
        "slash_commands": [
            {
-               "command": "/status",
-               "url": "https://your-host.example.com/slack/commands",
-               "description": "Show RAG / MCP health and optionally reconnect (usage: /status reconnect)",
-               "usage_hint": "[reconnect]"
-           },
-           {
                "command": "/mcp_api_key",
-               "url": "https://your-host.example.com/slack/commands",
+               "url": "https://nancy-bot.malpas.nz/slack/commands",
                "description": "Issue a per-user Nancy Brain MCP API key",
                "usage_hint": ""
            }
@@ -50,13 +44,14 @@
                 "metadata.message:read",
                 "mpim:history",
                 "mpim:read",
-                "users:read"
+                "users:read",
+                "commands"
             ]
         }
     },
     "settings": {
         "event_subscriptions": {
-            "request_url": "https://f7e0fce54be6.ngrok-free.app/slack/events",
+            "request_url": "https://nancy-bot.malpas.nz/slack/events",
             "bot_events": [
                 "app_home_opened",
                 "app_mention",
@@ -68,7 +63,7 @@
         },
         "interactivity": {
             "is_enabled": true,
-            "request_url": "https://f7e0fce54be6.ngrok-free.app/slack/interactive"
+            "request_url": "https://nancy-bot.malpas.nz/slack/interactive"
         },
         "org_deploy_enabled": false,
         "socket_mode_enabled": false,

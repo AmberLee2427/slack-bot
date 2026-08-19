@@ -74,7 +74,7 @@
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "*🔧 Access Config (Hosted Nancy + Custom MCP)*\n\n*Hosted Nancy (cloud API):* Get your key with `/mcp_api_key`, then pass it as `X-API-Key`.\n\n```bash\ncurl -H \"X-API-Key: $MCP_API_KEY\" \"https://nancy-brain.malpas.nz/search?query=roman&limit=5\"\n```\n\n*Custom build (full MCP in editor via stdio):*\n\n```json\n{\n  \"mcpServers\": {\n    \"nancy-brain\": {\n      \"command\": \"nancy-brain-mcp\",\n      \"args\": [\n        \"--embeddings-path\", \"/path/to/knowledge_base/embeddings\",\n        \"--config\", \"/path/to/config/repositories.yml\",\n        \"--weights\", \"/path/to/config/weights.yaml\"\n      ]\n    }\n  }\n}\n```"
+        "text": "*🔧 Connect Your Own Assistant to Nancy Brain*\n\nUse the existing hosted microlensing knowledge base. Run `/mcp_api_key` here to receive your personal key, then connect your MCP client to:\n\n`https://mcp.rges-pit.com/mcp`\n\nNancy accepts the key as `X-API-Key` or `Authorization: Bearer`. Client-specific setup for Codex, VS Code, Claude Code, and other clients is at <https://nancy.rges-pit.com/|nancy.rges-pit.com>.\n\nWant to build a different knowledge base instead? See the <https://nancy-docs.malpas.nz/|Nancy Brain package documentation>."
       }
     },
     {

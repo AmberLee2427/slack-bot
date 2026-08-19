@@ -19,12 +19,19 @@
 
 ## What you need
 
-1. An invite code from the Nancy administrators.
-2. A personal Nancy API key.
-3. An MCP client that supports Streamable HTTP and custom authentication
+1. A personal Nancy API key. RGES-PIT Slack members can run
+   `/mcp_api_key` in Slack; other users need an invite code from the Nancy
+   administrators.
+2. An MCP client that supports Streamable HTTP and custom authentication
    headers.
 
-Request your personal key once:
+RGES-PIT Slack members should request their key privately from Nancy:
+
+```text
+/mcp_api_key
+```
+
+If you were given an invite code instead, request your personal key once:
 
 ```bash
 curl -X POST https://mcp.rges-pit.com/v2/api-keys/request \
