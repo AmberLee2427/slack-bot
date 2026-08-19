@@ -118,7 +118,7 @@ class LLMService:
         from bot.plugins.rag.mcp_adapter import MCPRAGAdapter
 
         try:
-            mcp_timeout = int(os.environ.get("MCP_TIMEOUT_SECONDS", "30"))
+            mcp_timeout = int(os.environ.get("MCP_TIMEOUT_SECONDS", "90"))
             self.rag = MCPRAGAdapter(
                 MCP_BASE_URL,
                 api_key=MCP_API_KEY,
@@ -633,6 +633,7 @@ class LLMService:
         payload = None
         turn = 0
         searching = True
+        response_sent = False
         context_files = set()
         meta_prompt = ""
 
@@ -780,6 +781,8 @@ class LLMService:
                         callback_fn(
                             response_text, True, hit_turn_limit=False
                         )  # Mark as final response, didn't hit limit
+                        response_sent = True
+                        searching = False
                         if self.debugging:
                             logger.info("Response sent to callback successfully")
                     else:
@@ -802,26 +805,58 @@ class LLMService:
             )
             payload["messages"].append({"role": "user", "content": meta_prompt})
 
-            # Exit the loop if the agent has requested it
+            if response_sent:
+                break
+
+            # DONE is only valid alongside a user-facing response. If the model
+            # stops after tool work, keep the loop alive and demand synthesis.
             if "[DONE]" in llm_text:
-                searching = False
-                # If DONE was used without a RESPONSE, send a fallback message
-                if "RESPONSE" not in llm_text:
-                    callback_fn(
-                        "  :thinking_face: _Analysis complete - awaiting further instructions_",
-                        True,
-                        hit_turn_limit=False,
-                    )
+                payload["messages"].append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "You emitted [DONE] without a valid [BEGIN RESPONSE]..."
+                            "[END RESPONSE] block. The user still needs an answer. "
+                            "Synthesize the evidence you gathered into a sourced, "
+                            "user-facing response now."
+                        ),
+                    }
+                )
 
             turn += 1
 
-        # If we finished without a response (searching is still True means we hit the limit)
-        if searching:
-            callback_fn(
-                "  :warning: _Thinking limit reached - providing current analysis_",
-                True,
-                hit_turn_limit=True,
+        # Reserve one final provider call for synthesis after the tool budget.
+        if searching and not response_sent:
+            payload["messages"].append(
+                {
+                    "role": "user",
+                    "content": (
+                        "The tool phase is over. Do not request more tools and do not "
+                        "ask the user to continue. Answer the original question using "
+                        "the evidence already gathered. Return exactly one "
+                        "[BEGIN RESPONSE]...[END RESPONSE] block followed by [DONE]."
+                    ),
+                }
             )
+            llm_text, _ = self.querry_llm(
+                payload,
+                turn,
+                user_id,
+                provider=provider,
+            )
+            response_text = self.response_tool(self, llm_text or "")
+            if response_text:
+                callback_fn(response_text, True, hit_turn_limit=True)
+                response_sent = True
+                searching = False
+            else:
+                logger.error("Final synthesis turn did not produce a valid response")
+                callback_fn(
+                    ":warning: I searched the knowledge base but failed to synthesize "
+                    "a complete answer. Please retry; this failure has been logged.",
+                    True,
+                    hit_turn_limit=False,
+                )
 
         # Update thread context cache with files Nancy looked at in this session
         if thread_ts and context_files:

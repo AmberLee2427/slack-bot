@@ -76,7 +76,7 @@ def test_llm_service_initializes_with_mock_adapter(monkeypatch, _mock_env):
     )
 
     assert llm.rag_status.get("available") is True
-    assert llm.rag.timeout == 30
+    assert llm.rag.timeout == 90
     assert llm.get_initial_context("ping").startswith("context for ping")
     assert llm.all_indexed_files == ["doc1"]
     assert llm.indexed_file_map["doc1"] == "hello world"
@@ -203,3 +203,70 @@ def test_anthropic_usage_error_latches_custom_fallback(monkeypatch):
     assert llm.force_custom_fallback is True
     assert anthropic.messages.create.call_count == 1
     assert custom.call_count == 2
+
+
+def _initialized_service(monkeypatch, env, max_turns=1):
+    monkeypatch.setattr("bot.plugins.rag.mcp_adapter.MCPRAGAdapter", DummyAdapter)
+    monkeypatch.setattr(
+        "bot.plugins.llm.llm_service.requests.get", lambda *_, **__: FakeResp()
+    )
+    service = LLMService(
+        system_prompt=env["prompt"],
+        model_weights_path=env["weights"],
+        max_turns=max_turns,
+    )
+    service.rate_limiter = MagicMock()
+    service.rate_limiter.check_and_increment.return_value = (True, 100, 99)
+    service.get_initial_context = MagicMock(return_value="retrieved evidence")
+    return service
+
+
+def test_done_without_response_forces_final_synthesis(monkeypatch, _mock_env):
+    service = _initialized_service(monkeypatch, _mock_env)
+    service.querry_llm = MagicMock(
+        side_effect=[
+            ("I have enough evidence. [DONE]", "turn one"),
+            (
+                "[BEGIN RESPONSE]The six columns are documented here.[END RESPONSE] [DONE]",
+                "final turn",
+            ),
+        ]
+    )
+    callbacks = []
+
+    service.call_llm_with_callback(
+        "What are the output columns?",
+        lambda message, is_final=False, hit_turn_limit=False: callbacks.append(
+            (message, is_final, hit_turn_limit)
+        ),
+        user_id="U123",
+    )
+
+    assert callbacks == [("The six columns are documented here.", True, True)]
+    assert service.querry_llm.call_count == 2
+    final_payload = service.querry_llm.call_args_list[1].args[0]
+    assert "The tool phase is over" in final_payload["messages"][-1]["content"]
+
+
+def test_failed_final_synthesis_reports_failure_not_placeholder(monkeypatch, _mock_env):
+    service = _initialized_service(monkeypatch, _mock_env)
+    service.querry_llm = MagicMock(
+        side_effect=[
+            ("I have enough evidence. [DONE]", "turn one"),
+            ("Analysis complete - awaiting further instructions", "final turn"),
+        ]
+    )
+    callbacks = []
+
+    service.call_llm_with_callback(
+        "What are the output columns?",
+        lambda message, is_final=False, hit_turn_limit=False: callbacks.append(
+            (message, is_final, hit_turn_limit)
+        ),
+        user_id="U123",
+    )
+
+    assert len(callbacks) == 1
+    assert callbacks[0][1:] == (True, False)
+    assert "failed to synthesize" in callbacks[0][0]
+    assert "awaiting further instructions" not in callbacks[0][0]
