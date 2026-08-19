@@ -111,6 +111,7 @@ services:
       - CUSTOM_URL=${CUSTOM_URL:-}
       - MCP_BASE_URL=http://nancy-brain:8000
       - MCP_API_KEY=${MCP_API_KEY}
+      - MCP_TIMEOUT_SECONDS=${MCP_TIMEOUT_SECONDS:-90}
       - DAILY_RATE_LIMIT=${DAILY_RATE_LIMIT:-100}
       - DEBUG_LLM=${DEBUG_LLM:-False}
       - PYTHONUNBUFFERED=1
