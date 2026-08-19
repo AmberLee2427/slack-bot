@@ -106,6 +106,7 @@ def _bare_service(custom_enabled: bool = True) -> LLMService:
     llm.custom_enabled = custom_enabled
     llm.llm_provider = "anthropic"
     llm.force_custom_fallback = False
+    llm.provider_failure_callback = None
     llm.rate_limiter = MagicMock()
     return llm
 
@@ -185,6 +186,8 @@ def test_anthropic_usage_error_latches_custom_fallback(monkeypatch):
         status_code = 429
 
     llm = _bare_service()
+    notifier = MagicMock()
+    llm.provider_failure_callback = notifier
     anthropic = MagicMock()
     anthropic.messages.create.side_effect = UsageError("rate limit exceeded")
     monkeypatch.setattr(llm_module, "anthropic_client", anthropic)
@@ -203,6 +206,8 @@ def test_anthropic_usage_error_latches_custom_fallback(monkeypatch):
     assert llm.force_custom_fallback is True
     assert anthropic.messages.create.call_count == 1
     assert custom.call_count == 2
+    notifier.assert_called_once()
+    assert isinstance(notifier.call_args.args[0], UsageError)
 
 
 def _initialized_service(monkeypatch, env, max_turns=1):

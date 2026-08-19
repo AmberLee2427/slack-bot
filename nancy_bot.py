@@ -42,7 +42,11 @@ class NancyBot:
 
         # Initialize AI services (do NOT instantiate heavy in-process RAG here)
         # LLMService will prefer an MCP adapter when MCP_BASE_URL is set, or accept an injected rag_service.
-        self.llm_service = LLMService(rag_service=None, debugging=None)
+        self.llm_service = LLMService(
+            rag_service=None,
+            debugging=None,
+            provider_failure_callback=self._notify_provider_failure,
+        )
 
         # Initialize handlers
         self.conversation_manager = ConversationManager(self.slack_client)
@@ -56,6 +60,56 @@ class NancyBot:
             self.base_dir,
             self.message_handler,
         )
+
+    def _notify_provider_failure(self, exc: Exception) -> None:
+        """Send one operator DM when Anthropic fails over to the custom model."""
+        user_id = os.environ.get("SLACK_ALERT_USER_ID", "").strip()
+        token = self.slack_client.bot_token
+        if not user_id:
+            logger.warning("SLACK_ALERT_USER_ID is not configured; skipping provider alert")
+            return
+        if not token:
+            logger.warning("Slack bot token is unavailable; skipping provider alert")
+            return
+
+        status_code = getattr(exc, "status_code", None)
+        reason = f"HTTP {status_code}" if status_code else type(exc).__name__
+        headers = {"Authorization": f"Bearer {token}"}
+        conversation = requests.post(
+            "https://slack.com/api/conversations.open",
+            headers=headers,
+            data={"users": user_id},
+            timeout=15,
+        )
+        conversation.raise_for_status()
+        conversation_data = conversation.json()
+        if not conversation_data.get("ok"):
+            raise RuntimeError(
+                f"Slack conversations.open failed: {conversation_data.get('error')}"
+            )
+
+        message = requests.post(
+            "https://slack.com/api/chat.postMessage",
+            headers=headers,
+            data={
+                "channel": conversation_data["channel"]["id"],
+                "text": (
+                    ":warning: *Nancy provider failover*\n\n"
+                    f"`{os.environ.get('CLAUDE_MODEL', 'Anthropic')}` failed "
+                    f"({reason}). Nancy has switched to "
+                    f"`{self.llm_service.custom_model}` and remains available.\n\n"
+                    "Check `docker logs nancy-slack-bot` for the full error. "
+                    "The fallback remains active until Nancy restarts."
+                ),
+            },
+            timeout=15,
+        )
+        message.raise_for_status()
+        message_data = message.json()
+        if not message_data.get("ok"):
+            raise RuntimeError(
+                f"Slack chat.postMessage failed: {message_data.get('error')}"
+            )
 
     def _is_valid_slack_request(self, request: web.Request, body: str) -> bool:
         """Verify a Slack request, failing closed outside explicit test mode."""

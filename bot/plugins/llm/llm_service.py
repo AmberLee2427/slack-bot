@@ -42,6 +42,7 @@ class LLMService:
         no_of_retrievals: int = 5,
         rag_service=None,  # Accept existing RAG service
         daily_rate_limit: int = None,  # Daily queries per user (None = use env var)
+        provider_failure_callback=None,
     ):
         # Use Nancy's base directory for all paths
         nancy_base = Path(os.environ.get("NANCY_BASE_DIR", "."))
@@ -80,6 +81,7 @@ class LLMService:
                 "LLM_PROVIDER=custom requires CUSTOM_API_KEY, CUSTOM_MODEL, and CUSTOM_URL"
             )
         self.force_custom_fallback = False
+        self.provider_failure_callback = provider_failure_callback
         self.update_weights()
 
         # Load system prompt content
@@ -519,6 +521,11 @@ class LLMService:
                             exc,
                         )
                         self.force_custom_fallback = True
+                        if self.provider_failure_callback:
+                            try:
+                                self.provider_failure_callback(exc)
+                            except Exception:
+                                logger.exception("Provider failure notification failed")
                         active_provider = "custom"
                         llm_text = self._query_custom(payload)
 
