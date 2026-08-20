@@ -3,10 +3,12 @@ Nancy - A simple Slack bot with RAG capabilities
 Built specifically for microlensing assistance without unnecessary complexity
 """
 import asyncio
+import hmac
 import logging
 import os
 import json
 import urllib.parse
+from html import escape
 from pathlib import Path
 from typing import Dict, Any
 from aiohttp import web
@@ -160,6 +162,128 @@ class NancyBot:
 
         task.add_done_callback(_done)
         return task
+
+    async def handle_commissioning_alert(self, request: web.Request) -> web.Response:
+        """Post an authenticated Nexus alert to the fixed commissioning channel."""
+        if request.content_length is not None and request.content_length > 65536:
+            return web.json_response(
+                {"ok": False, "error": "request body is too large"}, status=413
+            )
+
+        expected_token = os.environ.get("COMMISSIONING_ALERT_TOKEN", "").strip()
+        channel_id = os.environ.get("COMMISSIONING_CHANNEL_ID", "").strip()
+        if not expected_token or not channel_id:
+            logger.error("Commissioning alert endpoint is not fully configured")
+            return web.json_response(
+                {"ok": False, "error": "commissioning alerts are not configured"},
+                status=503,
+            )
+
+        authorization = request.headers.get("Authorization", "")
+        scheme, _, supplied_token = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not hmac.compare_digest(
+            supplied_token, expected_token
+        ):
+            return web.json_response(
+                {"ok": False, "error": "unauthorized"}, status=401
+            )
+
+        try:
+            payload = await request.json()
+        except (json.JSONDecodeError, ValueError):
+            return web.json_response(
+                {"ok": False, "error": "request body must be JSON"}, status=400
+            )
+        if not isinstance(payload, dict):
+            return web.json_response(
+                {"ok": False, "error": "request body must be an object"}, status=400
+            )
+
+        required = ("alert_id", "title", "summary")
+        missing = [key for key in required if not str(payload.get(key, "")).strip()]
+        if missing:
+            return web.json_response(
+                {"ok": False, "error": f"missing required fields: {', '.join(missing)}"},
+                status=400,
+            )
+
+        severity = str(payload.get("severity", "warning")).strip().lower()
+        severity_labels = {
+            "info": ":information_source: INFO",
+            "warning": ":warning: WARNING",
+            "critical": ":rotating_light: CRITICAL",
+            "resolved": ":white_check_mark: RESOLVED",
+        }
+        if severity not in severity_labels:
+            return web.json_response(
+                {
+                    "ok": False,
+                    "error": "severity must be info, warning, critical, or resolved",
+                },
+                status=400,
+            )
+
+        alert_id = str(payload["alert_id"]).strip()[:128]
+        title = escape(str(payload["title"]).strip()[:120], quote=False)
+        summary = escape(str(payload["summary"]).strip()[:2500], quote=False)
+        occurred_at = escape(
+            str(payload.get("occurred_at", "")).strip()[:80], quote=False
+        )
+        dashboard_url = str(payload.get("dashboard_url", "")).strip()
+        if dashboard_url and not dashboard_url.startswith("https://"):
+            return web.json_response(
+                {"ok": False, "error": "dashboard_url must use https"}, status=400
+            )
+
+        context = [f"ID: `{escape(alert_id, quote=False)}`"]
+        if occurred_at:
+            context.append(f"Observed: {occurred_at}")
+        blocks = [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": f"{severity_labels[severity]} — {title}"[:150],
+                    "emoji": True,
+                },
+            },
+            {"type": "section", "text": {"type": "mrkdwn", "text": summary}},
+            {
+                "type": "context",
+                "elements": [{"type": "mrkdwn", "text": " • ".join(context)}],
+            },
+        ]
+        if dashboard_url:
+            blocks.append(
+                {
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "Open dashboard"},
+                            "url": dashboard_url,
+                            "action_id": "open_commissioning_dashboard",
+                        }
+                    ],
+                }
+            )
+
+        try:
+            response = await self.slack_client.send_message(
+                channel=channel_id,
+                text=f"[{severity.upper()}] {title}: {summary}"[:3000],
+                blocks=blocks,
+            )
+        except Exception:
+            logger.exception("Failed to deliver commissioning alert %s", alert_id)
+            return web.json_response(
+                {"ok": False, "error": "Slack delivery failed"}, status=502
+            )
+        if response is None:
+            return web.json_response(
+                {"ok": False, "error": "Slack client is unavailable"}, status=503
+            )
+        return web.json_response({"ok": True, "alert_id": alert_id})
         
     async def handle_event(self, request: web.Request) -> web.Response:
         """Handle Slack events via HTTP"""
@@ -423,6 +547,7 @@ async def create_app() -> web.Application:
     app.router.add_post("/slack/events", bot.handle_event)
     app.router.add_post("/slack/interactive", bot.handle_interactive)
     app.router.add_post("/slack/commands", bot.handle_command)
+    app.router.add_post("/api/commissioning/alerts", bot.handle_commissioning_alert)
 
     # Ops endpoints
     app.router.add_get("/health", bot.handle_health)

@@ -2,7 +2,7 @@ import os
 
 import types
 import sys
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 import pytest_asyncio
@@ -54,6 +54,8 @@ async def app_client(monkeypatch):
     monkeypatch.setattr("nancy_bot.NancyBot._attempt_reconnect", lambda self: (True, "reconnected (test)"))
     monkeypatch.delenv("MCP_BASE_URL", raising=False)
     monkeypatch.setenv("SLACK_ALLOW_UNSIGNED_REQUESTS", "true")
+    monkeypatch.setenv("COMMISSIONING_ALERT_TOKEN", "commissioning-secret")
+    monkeypatch.setenv("COMMISSIONING_CHANNEL_ID", "C_COMMISSIONING")
     app = await create_app()
     server = TestServer(app)
     await server.start_server()
@@ -69,6 +71,55 @@ async def app_client(monkeypatch):
 async def post_form(client, data: dict):
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     return await client.post("/slack/commands", data=data, headers=headers)
+
+
+@pytest.mark.asyncio
+async def test_commissioning_alert_posts_only_to_configured_channel(app_client):
+    send_message = AsyncMock(return_value={"ok": True, "ts": "123.456"})
+    app_client.server.app["bot"].slack_client.send_message = send_message
+
+    resp = await app_client.post(
+        "/api/commissioning/alerts",
+        json={
+            "alert_id": "detector-temperature-001",
+            "severity": "warning",
+            "title": "Detector temperature drift",
+            "summary": "Median residual exceeded the commissioning threshold.",
+            "occurred_at": "2026-08-19T12:00:00Z",
+            "dashboard_url": "https://roman.science.stsci.edu/dashboard",
+            "channel": "C_WRONG_CHANNEL",
+        },
+        headers={"Authorization": "Bearer commissioning-secret"},
+    )
+
+    assert resp.status == 200
+    assert await resp.json() == {
+        "ok": True,
+        "alert_id": "detector-temperature-001",
+    }
+    assert send_message.await_args.kwargs["channel"] == "C_COMMISSIONING"
+
+
+@pytest.mark.asyncio
+async def test_commissioning_alert_rejects_bad_token(app_client):
+    resp = await app_client.post(
+        "/api/commissioning/alerts",
+        json={"alert_id": "a1", "title": "Alert", "summary": "Summary"},
+        headers={"Authorization": "Bearer wrong"},
+    )
+
+    assert resp.status == 401
+
+
+@pytest.mark.asyncio
+async def test_commissioning_alert_validates_payload(app_client):
+    resp = await app_client.post(
+        "/api/commissioning/alerts",
+        json={"alert_id": "a1", "severity": "apocalypse"},
+        headers={"Authorization": "Bearer commissioning-secret"},
+    )
+
+    assert resp.status == 400
 
 
 @pytest.mark.asyncio

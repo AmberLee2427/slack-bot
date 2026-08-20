@@ -165,33 +165,33 @@ class InteractiveHandler:
                 logger.warning(f"Unknown action_id: {action_id}")
 
     async def handle_view_docs(self, user_id: str, trigger_id: str):
-        """Handle 'Challenge Docs' button click"""
+        """Handle the RGES-PIT documentation button."""
         try:
             # Create a modal or send a message about challenge docs
             modal = {
                 "type": "modal",
-                "title": {"type": "plain_text", "text": "📋 Challenge Docs"},
+                "title": {"type": "plain_text", "text": "📋 RGES-PIT Docs"},
                 "close": {"type": "plain_text", "text": "Close"},
                 "blocks": [
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": "*Roman Galactic Exoplanet Survey - Data Challenge Resources*\n\nI have access to comprehensive documentation about:",
+                            "text": "*RGES-PIT and Roman Microlensing Resources*\n\nI have curated documentation about:",
                         },
                     },
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": "• **Submission procedures** via `microlens-submit`\n• **Data challenge guidelines** and requirements\n• **Analysis workflows** and best practices\n• **Technical specifications** for Roman telescope\n• **Tutorial notebooks** for microlensing analysis",
+                            "text": "• **RGES-PIT project workflows** and infrastructure\n• **Roman commissioning** context and diagnostics\n• **Microlensing analysis** methods and research articles\n• **Mission and instrument** documentation\n• **Team code repositories** and tutorials",
                         },
                     },
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": '💬 *Just ask me anything!* Try questions like:\n• "How do I submit my results?"\n• "What are the data challenge requirements?"\n• "Show me Roman telescope specifications"',
+                            "text": '💬 *Just ask me anything!* Try questions like:\n• "What does RGES-PIT maintain?"\n• "What commissioning diagnostics are available?"\n• "Find the Roman detector documentation"',
                         },
                     },
                 ],

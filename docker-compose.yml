@@ -1,6 +1,7 @@
 services:
   # Nancy Brain MCP Server
   nancy-brain:
+    profiles: ["local-brain"]
     build:
       context: ./ref/nancy-brain
       dockerfile: Dockerfile
@@ -46,6 +47,7 @@ services:
 
   # Nancy Brain Web UI
   nancy-ui:
+    profiles: ["local-brain"]
     build:
       context: ./ref/nancy-brain
       dockerfile: Dockerfile
@@ -104,13 +106,15 @@ services:
       - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
       - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
       - SLACK_ALLOW_UNSIGNED_REQUESTS=false
+      - COMMISSIONING_CHANNEL_ID=${COMMISSIONING_CHANNEL_ID:-}
+      - COMMISSIONING_ALERT_TOKEN=${COMMISSIONING_ALERT_TOKEN:-}
       - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-5}
       - CUSTOM_API_KEY=${CUSTOM_API_KEY:-}
       - CUSTOM_MODEL=${CUSTOM_MODEL:-}
       - CUSTOM_URL=${CUSTOM_URL:-}
-      - MCP_BASE_URL=http://nancy-brain:8000
+      - MCP_BASE_URL=${MCP_BASE_URL:-https://mcp.rges-pit.com}
       - MCP_API_KEY=${MCP_API_KEY}
       - MCP_TIMEOUT_SECONDS=${MCP_TIMEOUT_SECONDS:-90}
       - DAILY_RATE_LIMIT=${DAILY_RATE_LIMIT:-100}
@@ -121,9 +125,6 @@ services:
       - PORT=3000
     volumes:
       - ./bot/config:/app/bot/config
-    depends_on:
-      nancy-brain:
-        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:3000/health').raise_for_status()"]

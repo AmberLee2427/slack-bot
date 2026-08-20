@@ -5,7 +5,7 @@
       "type": "header",
       "text": {
         "type": "plain_text",
-        "text": "Nancy: Roman Microlensing Data Assistant"
+        "text": "Nancy: RGES-PIT Research Assistant"
       }
     },
     {
@@ -13,7 +13,7 @@
       "elements": [
         {
           "type": "mrkdwn",
-          "text": "ℹ️ Just start chatting with me. I have access to all challenge documentation, curated articles, and code repositories. I cannot search the web."
+          "text": "ℹ️ Ask me about RGES-PIT science, Roman microlensing, project documentation, commissioning work, research articles, or our code repositories. I search the curated Nancy Brain knowledge base—not the live web."
         }
       ]
     },
@@ -84,7 +84,7 @@
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "*🔍 Explore My Knowledge Base*"
+        "text": "*🔍 Explore RGES-PIT Knowledge*"
       }
     },
     {
@@ -94,7 +94,7 @@
 					"type": "button",
 					"text": {
 						"type": "plain_text",
-						"text": "Challenge Docs",
+						"text": "RGES-PIT Docs",
 						"emoji": true
 					},
 					"value": "view_docs",
@@ -129,7 +129,17 @@
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "*🚀 Quick Commands*\n\n• `/mcp_api_key` - Get your Nancy Brain MCP API key\n• `/my_quota` - Check your daily Sonnet usage\n• *Custom GPT*: https://chatgpt.com/g/g-68a9ed2774fc819189474563060e76f4-nancy\n• `@nancy help` - Get general assistance\n• 🍳 *Keep Cooking* button - Get deeper analysis when I finish a response\n• Just ask questions naturally - I'll search my knowledge base automatically!"
+        "text": "*🛰️ Commissioning*\n\nNancy can relay automated Nexus commissioning alerts into the private commissioning channel. Threshold evaluation and duplicate suppression remain on Nexus; Nancy handles authenticated Slack delivery and links back to the dashboard."
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*🚀 Quick Commands*\n\n• `/mcp_api_key` - Get your Nancy Brain MCP API key\n• `/my_quota` - Check your daily model usage\n• `@nancy help` - Get general RGES-PIT assistance\n• 🍳 *Keep Cooking* - Continue a deeper analysis\n• Just ask naturally—I’ll search the curated knowledge base automatically"
       }
     }
   ]
