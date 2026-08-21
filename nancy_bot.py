@@ -163,19 +163,19 @@ class NancyBot:
         task.add_done_callback(_done)
         return task
 
-    async def handle_commissioning_alert(self, request: web.Request) -> web.Response:
-        """Post an authenticated Nexus alert to the fixed commissioning channel."""
+    async def handle_private_alert(self, request: web.Request) -> web.Response:
+        """Post an authenticated alert to a fixed private channel."""
         if request.content_length is not None and request.content_length > 65536:
             return web.json_response(
                 {"ok": False, "error": "request body is too large"}, status=413
             )
 
-        expected_token = os.environ.get("COMMISSIONING_ALERT_TOKEN", "").strip()
-        channel_id = os.environ.get("COMMISSIONING_CHANNEL_ID", "").strip()
+        expected_token = os.environ.get("PRIVATE_ALERT_TOKEN", "").strip()
+        channel_id = os.environ.get("PRIVATE_ALERT_CHANNEL_ID", "").strip()
         if not expected_token or not channel_id:
-            logger.error("Commissioning alert endpoint is not fully configured")
+            logger.error("Private alert endpoint is not fully configured")
             return web.json_response(
-                {"ok": False, "error": "commissioning alerts are not configured"},
+                {"ok": False, "error": "private alerts are not configured"},
                 status=503,
             )
 
@@ -262,7 +262,7 @@ class NancyBot:
                             "type": "button",
                             "text": {"type": "plain_text", "text": "Open dashboard"},
                             "url": dashboard_url,
-                            "action_id": "open_commissioning_dashboard",
+                            "action_id": "open_private_alert_dashboard",
                         }
                     ],
                 }
@@ -275,7 +275,7 @@ class NancyBot:
                 blocks=blocks,
             )
         except Exception:
-            logger.exception("Failed to deliver commissioning alert %s", alert_id)
+            logger.exception("Failed to deliver private alert %s", alert_id)
             return web.json_response(
                 {"ok": False, "error": "Slack delivery failed"}, status=502
             )
@@ -360,35 +360,6 @@ class NancyBot:
             user_id = parsed.get('user_id', [''])[0]
 
             logger.info(f"Slash command received: {command} text={text} user={user_id}")
-
-            if command == "/my_quota":
-                stats = self.llm_service.rate_limiter.get_user_stats(user_id)
-                used = stats["used_today"]
-                daily_limit = stats["daily_limit"]
-                remaining = stats["remaining"]
-                percentage = (used / daily_limit) * 100 if daily_limit > 0 else 0
-
-                if percentage >= 100:
-                    indicator, status = "🔄", "Using Custom Fallback"
-                elif percentage >= 90:
-                    indicator, status = "⚠️", "Almost Full"
-                elif percentage >= 70:
-                    indicator, status = "🟡", "Getting High"
-                else:
-                    indicator, status = "✅", "Looking Good"
-
-                filled = min(10, int((percentage / 100) * 10))
-                progress_bar = "█" * filled + "░" * (10 - filled)
-                resp_text = (
-                    f"{indicator} *Your Sonnet Usage Today*\n\n"
-                    f"*Status:* {status}\n"
-                    f"*Usage:* {used}/{daily_limit} Sonnet queries ({percentage:.0f}%)\n"
-                    f"*Remaining:* {remaining} Sonnet queries\n\n"
-                    f"*Progress:* `{progress_bar}` {percentage:.0f}%\n\n"
-                    "_Your Sonnet allowance resets at midnight UTC. "
-                    "Nancy remains available through the custom model._"
-                )
-                return web.json_response({"response_type": "ephemeral", "text": resp_text})
 
             # Status/health check
             if command == '/status' or command == '/health':
@@ -547,7 +518,7 @@ async def create_app() -> web.Application:
     app.router.add_post("/slack/events", bot.handle_event)
     app.router.add_post("/slack/interactive", bot.handle_interactive)
     app.router.add_post("/slack/commands", bot.handle_command)
-    app.router.add_post("/api/commissioning/alerts", bot.handle_commissioning_alert)
+    app.router.add_post("/api/private-alerts", bot.handle_private_alert)
 
     # Ops endpoints
     app.router.add_get("/health", bot.handle_health)

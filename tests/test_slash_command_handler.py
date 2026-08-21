@@ -54,8 +54,8 @@ async def app_client(monkeypatch):
     monkeypatch.setattr("nancy_bot.NancyBot._attempt_reconnect", lambda self: (True, "reconnected (test)"))
     monkeypatch.delenv("MCP_BASE_URL", raising=False)
     monkeypatch.setenv("SLACK_ALLOW_UNSIGNED_REQUESTS", "true")
-    monkeypatch.setenv("COMMISSIONING_ALERT_TOKEN", "commissioning-secret")
-    monkeypatch.setenv("COMMISSIONING_CHANNEL_ID", "C_COMMISSIONING")
+    monkeypatch.setenv("PRIVATE_ALERT_TOKEN", "private-alert-secret")
+    monkeypatch.setenv("PRIVATE_ALERT_CHANNEL_ID", "C_PRIVATE_ALERTS")
     app = await create_app()
     server = TestServer(app)
     await server.start_server()
@@ -74,22 +74,22 @@ async def post_form(client, data: dict):
 
 
 @pytest.mark.asyncio
-async def test_commissioning_alert_posts_only_to_configured_channel(app_client):
+async def test_private_alert_posts_only_to_configured_channel(app_client):
     send_message = AsyncMock(return_value={"ok": True, "ts": "123.456"})
     app_client.server.app["bot"].slack_client.send_message = send_message
 
     resp = await app_client.post(
-        "/api/commissioning/alerts",
+        "/api/private-alerts",
         json={
             "alert_id": "detector-temperature-001",
             "severity": "warning",
             "title": "Detector temperature drift",
-            "summary": "Median residual exceeded the commissioning threshold.",
+            "summary": "A monitored value exceeded its configured threshold.",
             "occurred_at": "2026-08-19T12:00:00Z",
             "dashboard_url": "https://roman.science.stsci.edu/dashboard",
             "channel": "C_WRONG_CHANNEL",
         },
-        headers={"Authorization": "Bearer commissioning-secret"},
+        headers={"Authorization": "Bearer private-alert-secret"},
     )
 
     assert resp.status == 200
@@ -97,13 +97,13 @@ async def test_commissioning_alert_posts_only_to_configured_channel(app_client):
         "ok": True,
         "alert_id": "detector-temperature-001",
     }
-    assert send_message.await_args.kwargs["channel"] == "C_COMMISSIONING"
+    assert send_message.await_args.kwargs["channel"] == "C_PRIVATE_ALERTS"
 
 
 @pytest.mark.asyncio
-async def test_commissioning_alert_rejects_bad_token(app_client):
+async def test_private_alert_rejects_bad_token(app_client):
     resp = await app_client.post(
-        "/api/commissioning/alerts",
+        "/api/private-alerts",
         json={"alert_id": "a1", "title": "Alert", "summary": "Summary"},
         headers={"Authorization": "Bearer wrong"},
     )
@@ -112,11 +112,11 @@ async def test_commissioning_alert_rejects_bad_token(app_client):
 
 
 @pytest.mark.asyncio
-async def test_commissioning_alert_validates_payload(app_client):
+async def test_private_alert_validates_payload(app_client):
     resp = await app_client.post(
-        "/api/commissioning/alerts",
+        "/api/private-alerts",
         json={"alert_id": "a1", "severity": "apocalypse"},
-        headers={"Authorization": "Bearer commissioning-secret"},
+        headers={"Authorization": "Bearer private-alert-secret"},
     )
 
     assert resp.status == 400
@@ -143,30 +143,6 @@ async def test_status_reconnect_triggers_recheck(app_client):
 
     assert resp.status == 200
     assert "reconnected" in body.get("text", "")
-
-
-@pytest.mark.asyncio
-async def test_my_quota_returns_ephemeral_usage_without_incrementing(app_client):
-    rate_limiter = Mock()
-    rate_limiter.get_user_stats.return_value = {
-        "used_today": 23,
-        "daily_limit": 100,
-        "remaining": 77,
-    }
-    app_client.server.app["bot"].llm_service.rate_limiter = rate_limiter
-
-    resp = await post_form(
-        app_client,
-        {"command": "/my_quota", "user_id": "U123", "text": ""},
-    )
-    body = await resp.json()
-
-    assert resp.status == 200
-    assert body["response_type"] == "ephemeral"
-    assert "23/100" in body["text"]
-    assert "77 Sonnet queries" in body["text"]
-    rate_limiter.get_user_stats.assert_called_once_with("U123")
-    rate_limiter.check_and_increment.assert_not_called()
 
 
 @pytest.mark.asyncio

@@ -13,57 +13,7 @@
       "elements": [
         {
           "type": "mrkdwn",
-          "text": "ℹ️ Ask me about RGES-PIT science, Roman microlensing, project documentation, commissioning work, research articles, or our code repositories. I search the curated Nancy Brain knowledge base—not the live web."
-        }
-      ]
-    },
-    {
-      "type": "divider"
-    },
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "*📊 Daily Sonnet Allowance*\n\nEach user has a daily Sonnet allowance. After it is used, Nancy automatically continues on the custom model."
-      }
-    },
-    {
-      "type": "actions",
-      "elements": [
-        {
-          "type": "button",
-          "text": {
-            "type": "plain_text",
-            "text": "📊 Check My Usage",
-            "emoji": true
-          },
-          "value": "my usage",
-          "action_id": "btn_my_usage",
-          "style": "primary"
-        }
-      ]
-    },
-    {
-      "type": "context",
-      "elements": [
-        {
-          "type": "mrkdwn",
-          "text": "💡 *Usage Tips:* • Run `/my_quota` in any channel • Quotas reset at midnight UTC • Use 🍳 Keep Cooking for deeper analysis\nContact admin if you need more queries or talk for longer on my [customGPT](https://chatgpt.com/g/g-68a9ed2774fc819189474563060e76f4-nancy)."
-        }
-      ]
-    },
-    {
-      "type": "actions",
-      "elements": [
-        {
-          "type": "button",
-          "text": {
-            "type": "plain_text",
-          "text": "NancyGPT",
-            "emoji": true
-          },
-          "url": "https://chatgpt.com/g/g-68a9ed2774fc819189474563060e76f4-nancy",
-          "action_id": "btn_open_custom_gpt"
+          "text": "ℹ️ Ask me about RGES-PIT science, Roman microlensing, project documentation, research articles, or our code repositories. I search the curated Nancy Brain knowledge base—not the live web."
         }
       ]
     },
@@ -129,17 +79,7 @@
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "*🛰️ Commissioning*\n\nNancy can relay automated Nexus commissioning alerts into the private commissioning channel. Threshold evaluation and duplicate suppression remain on Nexus; Nancy handles authenticated Slack delivery and links back to the dashboard."
-      }
-    },
-    {
-      "type": "divider"
-    },
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "*🚀 Quick Commands*\n\n• `/mcp_api_key` - Get your Nancy Brain MCP API key\n• `/my_quota` - Check your daily model usage\n• `@nancy help` - Get general RGES-PIT assistance\n• 🍳 *Keep Cooking* - Continue a deeper analysis\n• Just ask naturally—I’ll search the curated knowledge base automatically"
+        "text": "*🚀 Quick Commands*\n\n• `/mcp_api_key` - Get your Nancy Brain MCP API key\n• `@nancy help` - Get general RGES-PIT assistance\n• 🍳 *Keep Cooking* - Continue a deeper analysis\n• Just ask naturally—I’ll search the curated knowledge base automatically"
       }
     }
   ]

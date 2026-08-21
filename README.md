@@ -78,31 +78,31 @@ The bot has access to:
 - **Knowledge base:** Built/maintained in `ref/nancy-brain`; this repo does not build embeddings.
 - **Tests:** Auto-start a local MCP server on `http://localhost:8123`.
 
-## Commissioning alerts
+## Private alerts
 
-Nexus can deliver evaluated, deduplicated commissioning alerts through Nancy:
+An internal service can deliver evaluated, deduplicated alerts through Nancy:
 
 ```http
-POST /api/commissioning/alerts
-Authorization: Bearer $COMMISSIONING_ALERT_TOKEN
+POST /api/private-alerts
+Authorization: Bearer $PRIVATE_ALERT_TOKEN
 Content-Type: application/json
 
 {
-  "alert_id": "detector-temperature-001",
+  "alert_id": "service-health-001",
   "severity": "warning",
-  "title": "Detector temperature drift",
-  "summary": "Median residual exceeded the commissioning threshold.",
+  "title": "Service health warning",
+  "summary": "A monitored value exceeded its configured threshold.",
   "occurred_at": "2026-08-19T12:00:00Z",
   "dashboard_url": "https://roman.science.stsci.edu/..."
 }
 ```
 
-Set `COMMISSIONING_CHANNEL_ID` to the private Slack channel ID and invite Nancy
+Set `PRIVATE_ALERT_CHANNEL_ID` to the private Slack channel ID and invite Nancy
 to that channel. The endpoint never accepts a destination channel from the
 request, so alerts cannot be redirected elsewhere. Supported severities are
 `info`, `warning`, `critical`, and `resolved`.
 
-Threshold evaluation, hysteresis, and duplicate suppression belong on Nexus;
+Threshold evaluation, hysteresis, and duplicate suppression belong upstream;
 Nancy only authenticates, formats, and delivers the alert.
 
 ## 🔑 MCP API Keys (nancy-brain)
