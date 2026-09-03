@@ -170,9 +170,14 @@ class NancyBot:
                 {"ok": False, "error": "request body is too large"}, status=413
             )
 
+        dry_run = os.environ.get("PRIVATE_ALERT_DRY_RUN", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }
         expected_token = os.environ.get("PRIVATE_ALERT_TOKEN", "").strip()
         channel_id = os.environ.get("PRIVATE_ALERT_CHANNEL_ID", "").strip()
-        if not expected_token or not channel_id:
+        if not expected_token or (not dry_run and not channel_id):
             logger.error("Private alert endpoint is not fully configured")
             return web.json_response(
                 {"ok": False, "error": "private alerts are not configured"},
@@ -268,10 +273,22 @@ class NancyBot:
                 }
             )
 
+        message_text = f"[{severity.upper()}] {title}: {summary}"[:3000]
+        if dry_run:
+            logger.info("Validated private alert %s in dry-run mode", alert_id)
+            return web.json_response(
+                {
+                    "ok": True,
+                    "dry_run": True,
+                    "alert_id": alert_id,
+                    "preview": {"text": message_text, "blocks": blocks},
+                }
+            )
+
         try:
             response = await self.slack_client.send_message(
                 channel=channel_id,
-                text=f"[{severity.upper()}] {title}: {summary}"[:3000],
+                text=message_text,
                 blocks=blocks,
             )
         except Exception:
@@ -283,7 +300,9 @@ class NancyBot:
             return web.json_response(
                 {"ok": False, "error": "Slack client is unavailable"}, status=503
             )
-        return web.json_response({"ok": True, "alert_id": alert_id})
+        return web.json_response(
+            {"ok": True, "dry_run": False, "alert_id": alert_id}
+        )
         
     async def handle_event(self, request: web.Request) -> web.Response:
         """Handle Slack events via HTTP"""

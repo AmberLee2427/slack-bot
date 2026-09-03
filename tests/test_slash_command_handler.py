@@ -56,6 +56,7 @@ async def app_client(monkeypatch):
     monkeypatch.setenv("SLACK_ALLOW_UNSIGNED_REQUESTS", "true")
     monkeypatch.setenv("PRIVATE_ALERT_TOKEN", "private-alert-secret")
     monkeypatch.setenv("PRIVATE_ALERT_CHANNEL_ID", "C_PRIVATE_ALERTS")
+    monkeypatch.delenv("PRIVATE_ALERT_DRY_RUN", raising=False)
     app = await create_app()
     server = TestServer(app)
     await server.start_server()
@@ -95,9 +96,44 @@ async def test_private_alert_posts_only_to_configured_channel(app_client):
     assert resp.status == 200
     assert await resp.json() == {
         "ok": True,
+        "dry_run": False,
         "alert_id": "detector-temperature-001",
     }
     assert send_message.await_args.kwargs["channel"] == "C_PRIVATE_ALERTS"
+
+
+@pytest.mark.asyncio
+async def test_private_alert_dry_run_validates_without_calling_slack(
+    app_client, monkeypatch
+):
+    monkeypatch.setenv("PRIVATE_ALERT_DRY_RUN", "true")
+    monkeypatch.delenv("PRIVATE_ALERT_CHANNEL_ID", raising=False)
+    send_message = AsyncMock(return_value={"ok": True, "ts": "123.456"})
+    app_client.server.app["bot"].slack_client.send_message = send_message
+
+    resp = await app_client.post(
+        "/api/private-alerts",
+        json={
+            "alert_id": "ice-thickness-warning-001",
+            "severity": "warning",
+            "title": "Global ice thickness",
+            "summary": "Measured 258 nm; warning criterion is greater than 100 nm.",
+            "occurred_at": "2026-08-20T14:08:48Z",
+            "dashboard_url": "https://roman.science.stsci.edu/dashboard",
+        },
+        headers={"Authorization": "Bearer private-alert-secret"},
+    )
+
+    assert resp.status == 200
+    body = await resp.json()
+    assert body["ok"] is True
+    assert body["dry_run"] is True
+    assert body["alert_id"] == "ice-thickness-warning-001"
+    assert body["preview"]["text"].startswith("[WARNING] Global ice thickness")
+    assert body["preview"]["blocks"][-1]["elements"][0]["url"].startswith(
+        "https://roman.science.stsci.edu/"
+    )
+    send_message.assert_not_awaited()
 
 
 @pytest.mark.asyncio

@@ -105,6 +105,18 @@ request, so alerts cannot be redirected elsewhere. Supported severities are
 Threshold evaluation, hysteresis, and duplicate suppression belong upstream;
 Nancy only authenticates, formats, and delivers the alert.
 
+For an end-to-end transport test that must not call Slack, set:
+
+```bash
+PRIVATE_ALERT_DRY_RUN=true
+```
+
+The endpoint still requires `PRIVATE_ALERT_TOKEN`, validates and formats the
+complete request, and returns the rendered `text` and `blocks` under `preview`.
+`PRIVATE_ALERT_CHANNEL_ID` is not required in this mode. The response includes
+`"dry_run": true`, and Nancy never invokes the Slack client. Restart the bot
+after changing the environment variable; restore it to `false` before live use.
+
 ## 🔑 MCP API Keys (nancy-brain)
 
 RGES-PIT Slack members can issue a personal MCP key with `/mcp_api_key`.
