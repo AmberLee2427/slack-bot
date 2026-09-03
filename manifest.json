@@ -19,7 +19,7 @@
        "slash_commands": [
            {
                "command": "/mcp_api_key",
-               "url": "https://nancy-bot.malpas.nz/slack/commands",
+               "url": "https://commissioning-nancy.rges-pit.com/slack/commands",
                "description": "Issue a per-user Nancy Brain MCP API key",
                "usage_hint": ""
            }
@@ -51,7 +51,7 @@
     },
     "settings": {
         "event_subscriptions": {
-            "request_url": "https://nancy-bot.malpas.nz/slack/events",
+            "request_url": "https://commissioning-nancy.rges-pit.com/slack/events",
             "bot_events": [
                 "app_home_opened",
                 "app_mention",
@@ -63,7 +63,7 @@
         },
         "interactivity": {
             "is_enabled": true,
-            "request_url": "https://nancy-bot.malpas.nz/slack/interactive"
+            "request_url": "https://commissioning-nancy.rges-pit.com/slack/interactive"
         },
         "org_deploy_enabled": false,
         "socket_mode_enabled": false,

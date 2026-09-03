@@ -82,6 +82,11 @@ The bot has access to:
 
 An internal service can deliver evaluated, deduplicated alerts through Nancy:
 
+The commissioning deployment is currently exposed from the Mac test instance at
+`https://commissioning-nancy.rges-pit.com`. The hostname will move to a separate
+Framework-hosted tunnel for commissioning; it must never route to production
+Nancy.
+
 ```http
 POST /api/private-alerts
 Authorization: Bearer $PRIVATE_ALERT_TOKEN
@@ -116,6 +121,9 @@ complete request, and returns the rendered `text` and `blocks` under `preview`.
 `PRIVATE_ALERT_CHANNEL_ID` is not required in this mode. The response includes
 `"dry_run": true`, and Nancy never invokes the Slack client. Restart the bot
 after changing the environment variable; restore it to `false` before live use.
+
+If port 3000 is already occupied on the host, set `NANCY_BOT_PORT=3001` in
+`.env`. The container still listens on port 3000 internally.
 
 ## 🔑 MCP API Keys (nancy-brain)
 
