@@ -3,9 +3,12 @@ Nancy - A simple Slack bot with RAG capabilities
 Built specifically for microlensing assistance without unnecessary complexity
 """
 import asyncio
+import hashlib
+import hmac
 import logging
 import os
 import json
+import time
 import urllib.parse
 from pathlib import Path
 from typing import Dict, Any
@@ -139,7 +142,36 @@ class NancyBot:
             return False
 
         if not is_valid:
-            logger.warning("Rejected Slack request with an invalid signature")
+            try:
+                age_seconds = int(time.time()) - int(timestamp)
+            except (TypeError, ValueError):
+                age_seconds = None
+
+            expected_prefix = "unavailable"
+            signing_secret = os.environ.get("SLACK_SIGNING_SECRET", "")
+            if signing_secret:
+                base = f"v0:{timestamp}:{body}".encode("utf-8")
+                expected_prefix = (
+                    "v0="
+                    + hmac.new(
+                        signing_secret.encode("utf-8"),
+                        base,
+                        hashlib.sha256,
+                    ).hexdigest()
+                )[:14]
+
+            logger.warning(
+                "Rejected Slack request with an invalid signature: "
+                "path=%s age_seconds=%s body_bytes=%s content_type=%s "
+                "content_encoding=%s received=%s expected=%s",
+                request.path,
+                age_seconds,
+                len(body.encode("utf-8")),
+                request.headers.get("Content-Type", ""),
+                request.headers.get("Content-Encoding", ""),
+                signature[:14],
+                expected_prefix,
+            )
             return False
 
         return True
