@@ -1,0 +1,3 @@
+# Replace /app/Nancy-MAST-Watch with the directory used inside Nancy's
+# container. This only shows the cron command; it does not alter deployment.
+*/15 * * * * cd /app/Nancy-MAST-Watch && /usr/local/bin/python watch.py poll >> state/cron.log 2>&1
