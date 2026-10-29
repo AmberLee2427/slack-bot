@@ -1,0 +1,7 @@
+[Unit]
+Description=Reboot during maintenance window when Ubuntu requires it
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nancy-reboot-if-required
+

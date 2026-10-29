@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly Codex extension reset
+
+[Timer]
+OnCalendar=*-*-* 04:15:00 America/New_York
+Persistent=false
+
+[Install]
+WantedBy=timers.target
+

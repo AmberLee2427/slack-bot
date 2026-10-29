@@ -1,0 +1,9 @@
+[Unit]
+Description=Reset long-running Codex extension processes
+
+[Service]
+Type=oneshot
+User=nancy
+ExecStart=/usr/local/sbin/nancy-reset-codex-session
+TimeoutStartSec=1min
+

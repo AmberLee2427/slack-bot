@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly reboot check after security updates
+
+[Timer]
+OnCalendar=Sun *-*-* 04:30:00 America/New_York
+Persistent=false
+
+[Install]
+WantedBy=timers.target
+
