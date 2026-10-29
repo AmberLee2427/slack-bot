@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+umask 077
 
 COMPOSE_DIR=${COMPOSE_DIR:-/home/nancy/slack-bot}
 STATE_DIR=${STATE_DIR:-/var/lib/nancy-maintenance/applications}
@@ -42,6 +43,9 @@ docker run --rm --network none --entrypoint nginx slack-bot-nancy-docs:latest -t
 
 rollback_on_error() {
     trap - ERR INT TERM
+    for container in "${containers[@]}"; do
+        docker logs --tail 100 "$container" > "$STATE_DIR/$container.failed.log" 2>&1 || true
+    done
     echo "Application deployment failed; restoring $rollback" >&2
     docker compose -f docker-compose.yml -f "$rollback" up -d --no-build --pull never "${services[@]}"
     exit 1
