@@ -36,6 +36,9 @@ docker run --rm --network none --entrypoint python slack-bot-nancy-brain:latest 
     -c 'import requests, streamlit, torch; import connectors.mcp_server.server'
 docker run --rm --network none --entrypoint python slack-bot-nancy-bot:latest \
     -c 'import requests, slack_sdk, anthropic; import bot.plugins.rag.mcp_adapter'
+docker run --rm --network none --entrypoint python slack-bot-nancy-brain:latest -m pip check
+docker run --rm --network none --entrypoint python slack-bot-nancy-bot:latest -m pip check
+docker run --rm --network none --entrypoint nginx slack-bot-nancy-docs:latest -t
 
 rollback_on_error() {
     trap - ERR INT TERM
