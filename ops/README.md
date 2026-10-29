@@ -6,7 +6,8 @@
 02:00 Eastern using `--pull --no-cache` (including dependency installation).
 Brain and UI use the same image. No KB build is run. At least 6 GiB free is required.
 Import checks precede deployment; container health, authenticated HTTP
-search/retrieve/tree, and public health checks follow deployment. Failures restore
+search/retrieve/tree, real MCP initialization/discovery/search tool call, and public
+health checks follow deployment. Failures restore
 previous image tags using `/var/lib/nancy-maintenance/applications/rollback.json`.
 The deployment lock also excludes local health repairs and tunnel updates.
 No source is pulled automatically. Dependency versions constrained by project pins

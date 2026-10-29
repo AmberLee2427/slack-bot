@@ -14,6 +14,7 @@ class UpdaterTests(unittest.TestCase):
             (root / "bin").mkdir()
             (root / "ops/maintenance").mkdir(parents=True)
             (root / "ops/maintenance/app-canary.py").touch()
+            (root / "ops/maintenance/mcp-canary.py").touch()
             fake = '''#!/usr/bin/env python3
 import os, sys
 from pathlib import Path

@@ -57,6 +57,7 @@ for _ in {1..36}; do
 done
 [[ $healthy == true ]]
 docker exec -i nancy-brain-mcp python - < "$COMPOSE_DIR/ops/maintenance/app-canary.py"
+docker exec -i nancy-brain-mcp python - < "$COMPOSE_DIR/ops/maintenance/mcp-canary.py"
 curl --fail --silent --show-error --max-time 30 https://nancy-brain.malpas.nz/health >/dev/null
 trap - ERR INT TERM
 git -c safe.directory="$COMPOSE_DIR" rev-parse HEAD > "$STATE_DIR/deployed-revision"
