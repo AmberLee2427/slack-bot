@@ -4,7 +4,7 @@
 
 `nancy-app-update.timer` rebuilds the current committed deployment each Saturday at
 02:00 Eastern using `--pull --no-cache` (including dependency installation).
-Brain and UI use the same image. No KB build is run. At least 8 GiB free is required.
+Brain and UI use the same image. No KB build is run. At least 6 GiB free is required.
 Import checks precede deployment; container health, authenticated HTTP
 search/retrieve/tree, and public health checks follow deployment. Failures restore
 previous image tags using `/var/lib/nancy-maintenance/applications/rollback.json`.
@@ -12,8 +12,8 @@ The deployment lock also excludes local health repairs and tunnel updates.
 No source is pulled automatically. Dependency versions constrained by project pins
 still require reviewed dependency updates. These are smoke tests, not the full CI suite.
 Rollback restores images only, not database/schema changes; review migrations separately.
-Rollback tags are retained deliberately and consume disk; prune older named tags
-only after a subsequent successful refresh, keeping the latest recovery set.
+One rollback tag per service is retained and replaced by the next refresh; disk
+usage is checked before building. Older untagged layers can be reclaimed by cleanup.
 Framework should monitor `nancy-app-update.service` and its timer alongside the
 existing maintenance units. Run manually with `sudo systemctl start nancy-app-update`.
 

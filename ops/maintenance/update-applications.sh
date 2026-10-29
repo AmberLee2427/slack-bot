@@ -12,17 +12,16 @@ git -c safe.directory="$COMPOSE_DIR" diff --quiet && git -c safe.directory="$COM
 }
 available=$(df --output=avail -k / | tail -1)
 if [[ ${1:-} != --deploy-built ]]; then
-    (( available >= 8 * 1024 * 1024 )) || { echo 'Need at least 8 GiB free before building' >&2; exit 1; }
+    (( available >= 6 * 1024 * 1024 )) || { echo 'Need at least 6 GiB free before building' >&2; exit 1; }
 fi
 
 services=(nancy-brain nancy-ui nancy-bot nancy-docs)
 containers=(nancy-brain-mcp nancy-brain-ui nancy-slack-bot nancy-hosted-docs)
-stamp=$(date -u +%Y%m%dT%H%M%SZ)
 rollback="$STATE_DIR/rollback.json"
 printf '{"services":{' > "$rollback"
 for i in "${!services[@]}"; do
     old=$(docker inspect -f '{{.Image}}' "${containers[$i]}")
-    tag="nancy-rollback/${services[$i]}:$stamp"
+    tag="nancy-rollback/${services[$i]}:previous"
     docker tag "$old" "$tag"
     (( i == 0 )) || printf ',' >> "$rollback"
     printf '"%s":{"image":"%s"}' "${services[$i]}" "$tag" >> "$rollback"
