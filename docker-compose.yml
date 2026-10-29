@@ -1,6 +1,7 @@
 services:
   # Nancy Brain MCP Server
   nancy-brain:
+    image: slack-bot-nancy-brain:latest
     build:
       context: ./ref/nancy-brain
       dockerfile: Dockerfile
@@ -46,6 +47,7 @@ services:
 
   # Nancy Brain Web UI
   nancy-ui:
+    image: slack-bot-nancy-brain:latest
     build:
       context: ./ref/nancy-brain
       dockerfile: Dockerfile

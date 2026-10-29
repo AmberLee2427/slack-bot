@@ -1,0 +1,9 @@
+[Unit]
+Description=Rebuild Nancy application images and verify or roll back deployment
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nancy-update-applications
+TimeoutStartSec=3h
+

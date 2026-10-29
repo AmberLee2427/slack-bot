@@ -1,0 +1,9 @@
+[Unit]
+Description=Weekly Nancy application security refresh
+
+[Timer]
+OnCalendar=Sat *-*-* 02:00:00 America/New_York
+Persistent=false
+
+[Install]
+WantedBy=timers.target
