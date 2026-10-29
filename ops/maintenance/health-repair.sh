@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-exec 8>/run/lock/nancy-deployment.lock
+install -d -o root -g root -m 0755 /run/nancy-maintenance
+exec 8>>/run/nancy-maintenance/deployment.lock
 flock -n 8 || exit 0
 
 COMPOSE_DIR=${COMPOSE_DIR:-/home/nancy/slack-bot}

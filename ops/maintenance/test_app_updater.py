@@ -36,7 +36,8 @@ if name == 'docker':
                 executable.chmod(0o755)
             # Redirect only the test lock; production uses the shared deployment lock.
             script = Path(__file__).with_name("update-applications.sh").read_text()
-            script = script.replace("/run/lock/nancy-deployment.lock", str(root / "deployment.lock"))
+            script = script.replace("install -d -o root -g root -m 0755 /run/nancy-maintenance", ":")
+            script = script.replace("/run/nancy-maintenance/deployment.lock", str(root / "deployment.lock"))
             result = subprocess.run(
                 ["bash", "-c", script], capture_output=True, text=True,
                 env={**os.environ, "PATH": str(root / "bin") + ":" + os.environ["PATH"],

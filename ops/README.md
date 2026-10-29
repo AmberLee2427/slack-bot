@@ -10,6 +10,17 @@ search/retrieve/tree, real MCP initialization/discovery/search tool call, and pu
 health checks follow deployment. Failures restore
 previous image tags using `/var/lib/nancy-maintenance/applications/rollback.json`.
 The deployment lock also excludes local health repairs and tunnel updates.
+All three scripts use `/run/nancy-maintenance/deployment.lock` in a root-owned
+directory, recreated after boot. Run maintenance scripts through sudo/systemd.
+The installer holds the old and new locks during migration and refuses to race
+active maintenance. The obsolete `/run/lock/nancy-deployment.lock` is not deleted.
+
+Install watchdog record access with
+`sudo bash ops/install-application-records-helper.sh`. The fixed no-argument
+`sudo -n /usr/local/sbin/nancy-watchdog-application-records` returns allowlisted
+records as `{filename: {modified: timestamp, text: redacted_tail}}`, bounded to
+6000 input bytes per file. Missing scheduled records return a status message;
+manual `/tmp` records are intentionally not substituted or represented as scheduled.
 No source is pulled automatically. Dependency versions constrained by project pins
 still require reviewed dependency updates. These are smoke tests, not the full CI suite.
 Rollback restores images only, not database/schema changes; review migrations separately.
