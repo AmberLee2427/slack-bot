@@ -58,7 +58,6 @@ Nancy exposes knowledge-base tools, not a language model. Your chosen AI client
 decides how to use the returned evidence and generates the answer.
 
 <aside class="nb-origin">
-  <img src="assets/nancy-portrait.png" alt="Illustrated portrait of Nancy Grace Roman">
   <div>
     <p class="nb-eyebrow">Why Nancy?</p>
     <h2>Built for the Roman microlensing community.</h2>
